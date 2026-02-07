@@ -1,0 +1,83 @@
+@import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@300..700&family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap');
+@import "tailwindcss";
+
+@theme {
+  /* ============ FONTS ============ */
+  --font-poppins: "Poppins", sans-serif;
+  --font-inter: "Inter", sans-serif;
+  --font-fira: "Fira Code", monospace;
+
+  /* ============ COLORS ============ */
+  /* Nota: En v4 puedes usar HSL directamente en la variable */
+  --color-background: hsl(0 0% 99%);
+  --color-foreground: hsl(0 0% 20%);
+  --color-card: hsl(0 0% 100%);
+  --color-card-foreground: hsl(0 0% 20%);
+  --color-primary: hsl(256 47% 52%);
+  --color-primary-foreground: hsl(0 0% 100%);
+  --color-accent: hsl(36 100% 45%);
+  --color-accent-foreground: hsl(0 0% 100%);
+  --color-border: hsl(0 0% 90%);
+  --color-muted-foreground: hsl(0 0% 45%);
+
+  /* Radios y otros */
+  --radius-xl: 0.75rem;
+
+  /* ============ ANIMATIONS ============ */
+  --keyframes-fade-in: {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  };
+  --animation-fade-in: fade-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* ============ DARK MODE ============ */
+@variant dark (&:where(.dark, .dark *));
+
+.dark {
+  --color-background: hsl(229 34% 15%);
+  --color-foreground: hsl(0 0% 95%);
+  --color-card: hsl(229 34% 18%);
+  --color-primary: hsl(256 54% 68%);
+  --color-accent: hsl(38 92% 50%);
+  --color-border: hsl(229 20% 25%);
+}
+
+/* ============ BASE STYLES ============ */
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground font-inter;
+    -webkit-font-smoothing: antialiased;
+  }
+  h1, h2, h3, h4, h5, h6, .font-heading {
+    @apply font-poppins tracking-tight font-semibold;
+  }
+  code, pre, .font-mono {
+    @apply font-fira;
+  }
+}
+
+/* ============ CUSTOM UTILITIES ============ */
+@utility glass {
+  @apply bg-white/70 backdrop-blur-md border border-white/20 shadow-sm dark:bg-[#1A1F35]/70 dark:border-white/10;
+}
+
+@utility glass-card {
+  @apply bg-card/80 backdrop-blur-lg border border-border/50 shadow-xl;
+}
+
+@utility custom-scrollbar {
+  &::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  &::-webkit-scrollbar-thumb {
+    @apply bg-muted-foreground/20 rounded-full hover:bg-muted-foreground/40;
+  }
+}
