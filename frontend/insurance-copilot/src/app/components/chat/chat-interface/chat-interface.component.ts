@@ -3,12 +3,12 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
-import { ChatService } from '../../../services/chat.service';
-import { AuthService } from '../../../services/auth.service';
-import { ChatMessageComponent } from '../chat-message/chat-message.component';
-import { SuggestedQueriesComponent } from '../suggested-queries/suggested-queries.component';
-import { SessionsListComponent } from '../sessions-list/sessions-list.component';
-import { ChatSession, Message } from '../../../shared/models/types';
+import { ChatService } from '@/app/services/chat.service';
+import { AuthService } from '@/app/services/auth.service';
+import { ChatMessageComponent } from '@/app/components/chat/chat-message/chat-message.component';
+import { SuggestedQueriesComponent } from '@/app/components/chat/suggested-queries/suggested-queries.component';
+import { SessionsListComponent } from '@/app/components/chat/sessions-list/sessions-list.component';
+import { ChatSession } from '@/app/shared/models/types';
 
 @Component({
   selector: 'app-chat-interface',
@@ -21,15 +21,18 @@ import { ChatSession, Message } from '../../../shared/models/types';
     SessionsListComponent,
   ],
   template: `
-    <div class="flex h-screen bg-background text-foreground font-sans overflow-hidden">
+    <div class="flex h-screen bg-background text-foreground overflow-hidden">
       <!-- Sidebar (Desktop) -->
-      <div class="hidden md:flex md:flex-col w-80 glass border-r border-border/50 shadow-2xl z-10 relative">
+      <div
+        class="hidden md:flex flex-col border-r border-border/50 shadow-2xl z-10 relative transition-all duration-300 ease-in-out glass"
+        [ngClass]="isSidebarOpen ? 'w-80 translate-x-0' : 'w-0 -translate-x-full opacity-0 overflow-hidden'"
+      >
         <div class="p-6 border-b border-white/10 flex items-center gap-3">
           <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center shadow-lg shadow-primary/20">
              <span class="text-white font-bold text-lg">I</span>
           </div>
           <h1 class="text-xl font-heading font-bold bg-clip-text text-transparent bg-gradient-to-r from-foreground to-foreground/70">
-            InsuroBot
+            Copilot
           </h1>
         </div>
         
@@ -40,6 +43,7 @@ import { ChatSession, Message } from '../../../shared/models/types';
             (onSessionSelect)="loadSession($event)"
             (onNewSession)="createSession()"
             (onDeleteSession)="deleteSession($event)"
+            (onRenameSession)="renameSession($event)"
           ></app-sessions-list>
         </div>
 
@@ -55,7 +59,7 @@ import { ChatSession, Message } from '../../../shared/models/types';
       </div>
 
       <!-- Main chat area -->
-      <div class="flex-1 flex flex-col relative bg-gradient-to-tr from-background via-background to-secondary/30">
+      <div class="flex-1 flex flex-col relative bg-gradient-to-tr from-background via-background to-secondary/30 w-full transition-all duration-300">
         <!-- Header (Mobile/Tablet) -->
         <div class="md:hidden flex items-center justify-between p-4 glass border-b border-border/50 sticky top-0 z-20">
           <div class="flex items-center gap-2">
@@ -74,7 +78,19 @@ import { ChatSession, Message } from '../../../shared/models/types';
 
         <!-- Header (Desktop) -->
         <div class="hidden md:flex items-center justify-between px-8 py-6 border-b border-border/40 backdrop-blur-sm bg-background/50 sticky top-0 z-10">
-          <h2 class="text-2xl font-heading font-semibold text-foreground/80 tracking-tight">{{ currentSessionTitle }}</h2>
+          <div class="flex items-center gap-4">
+             <button
+                (click)="toggleSidebar()"
+                class="p-2 rounded-lg hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+                [title]="isSidebarOpen ? 'Cerrar menú' : 'Abrir menú'"
+             >
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect width="18" height="18" x="3" y="3" rx="2" ry="2"/>
+                  <line x1="9" x2="9" y1="3" y2="21"/>
+                </svg>
+             </button>
+             <h2 class="text-2xl font-heading font-semibold text-foreground/80 tracking-tight">{{ currentSessionTitle }}</h2>
+          </div>
           <div class="flex items-center gap-2">
              <div class="h-2 w-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)] animate-pulse"></div>
              <span class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Online</span>
@@ -256,13 +272,19 @@ export class ChatInterfaceComponent implements OnInit, AfterViewChecked {
     this.chatService.deleteSession(sessionId).subscribe();
   }
 
+  renameSession(event: { id: string, newTitle: string }): void {
+    this.chatService.renameSession(event.id, event.newTitle).subscribe();
+  }
+
   logout(): void {
     this.authService.logout();
     window.location.reload();
   }
 
+  isSidebarOpen = true;
+
   toggleSidebar(): void {
-    // Implement sidebar toggle for mobile
+    this.isSidebarOpen = !this.isSidebarOpen;
   }
 
   private scrollToBottom(): void {

@@ -10,12 +10,11 @@ import { AuthService } from './services/auth.service';
   imports: [CommonModule, AuthPageComponent, ChatInterfaceComponent],
   template: `
     <div class="min-h-screen">
-      <app-auth-page
-        *ngIf="!(isLoggedIn$ | async)"
-      ></app-auth-page>
-      <app-chat-interface
-        *ngIf="(isLoggedIn$ | async)"
-      ></app-chat-interface>
+      @if(!(isLoggedIn$ | async)){
+        <app-auth-page></app-auth-page>
+      }@else{
+        <app-chat-interface></app-chat-interface>
+      }
     </div>
   `,
 })

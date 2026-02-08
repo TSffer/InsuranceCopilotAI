@@ -1,15 +1,38 @@
 services:
   db:
     image: pgvector/pgvector:pg16
-    container_name: insurance_copilot_db
+    container_name: insurance_db
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-admin}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-admin123}
-      POSTGRES_DB: ${POSTGRES_DB:-insurance_db}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-insurance_copilot}
     ports:
       - "5432:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - db_data:/var/lib/postgresql/data
+
+  #backend:
+  #  build: 
+  #    context: ./backend
+  #    dockerfile: Dockerfile
+  #  container_name: insurance_backend
+  #  depends_on:
+  #    - db
+  #  environment:
+  #    POSTGRES_CONNECTION_URI: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-insurance_copilot}
+  #    OPENAI_API_KEY: ${OPENAI_API_KEY}
+  #  ports:
+  #    - "8000:8000"
+
+  #frontend:
+  #  build:
+  #    context: ./frontend/insurance-copilot
+  #    dockerfile: Dockerfile
+  #  container_name: insurance_frontend
+  #  depends_on:
+  #    - backend
+  #  ports:
+  #    - "80:80"
 
 volumes:
-  postgres_data:
+  db_data:

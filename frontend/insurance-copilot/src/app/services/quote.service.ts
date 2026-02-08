@@ -1,8 +1,8 @@
 import { Injectable } from '@angular/core';
 import { Observable, of } from 'rxjs';
 import { delay } from 'rxjs/operators';
-import { InsuranceQuote, QuoteRequest, QuoteResponse } from '../shared/models/types';
-import { mockQuotes } from '../shared/data/mock-data';
+import { InsuranceQuote, QuoteRequest, QuoteResponse } from '@/app/shared/models/types';
+import { mockQuotes } from '@/app/shared/data/mock-data';
 
 @Injectable({
   providedIn: 'root',

@@ -72,8 +72,9 @@ export interface QueryAnalysis {
     vehicle?: {
       brand?: string;
       model?: string;
-      year?: number;
       type?: string;
+      usage?: string;
+      year?: number;
     };
     insurers?: string[];
     clauses?: string[];

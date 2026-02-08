@@ -1,33 +1,49 @@
 import { Injectable } from '@angular/core';
-import { BehaviorSubject, Observable, of } from 'rxjs';
-import { delay, tap } from 'rxjs/operators';
+import { HttpClient } from '@angular/common/http';
+import { BehaviorSubject, Observable, tap, map, of, switchMap } from 'rxjs';
 import {
   ChatSession,
   ChatMessageRequest,
   ChatMessageResponse,
-  ComparisonResult,
-} from '../shared/models/types';
-import { mockChatSession, mockComparisonResult, mockSessions } from '../shared/data/mock-data';
-import { MockResponse, directResponses, comparisonResponses, quotationResponses } from '../shared/data/mock-responses';
+} from '@/app/shared/models/types';
 
 @Injectable({
   providedIn: 'root',
 })
 export class ChatService {
+  private apiUrl = 'http://localhost:8000/api/v1'; // Base API URL
+
   private currentSessionSubject = new BehaviorSubject<ChatSession | null>(null);
   public currentSession$ = this.currentSessionSubject.asObservable();
 
-  private sessionsSubject = new BehaviorSubject<ChatSession[]>(mockSessions);
+  private sessionsSubject = new BehaviorSubject<ChatSession[]>([]);
   public sessions$ = this.sessionsSubject.asObservable();
 
-  constructor() {
-    this.loadDefaultSession();
+  constructor(private http: HttpClient) {
+    this.loadSessions();
   }
 
-  private loadDefaultSession(): void {
-    if (mockSessions.length > 0) {
-      this.currentSessionSubject.next(mockSessions[0]);
-    }
+  loadSessions(): void {
+    this.http.get<any[]>(`${this.apiUrl}/threads`).subscribe({
+      next: (threads) => {
+        // Map backend threads to ChatSession
+        const sessions: ChatSession[] = threads.map(t => ({
+          id: t.id,
+          userId: 'current-user', // Backend handles user context
+          title: t.title,
+          createdAt: new Date(t.created_at),
+          updatedAt: new Date(t.updated_at),
+          messages: [] // Messages loaded on demand
+        }));
+        this.sessionsSubject.next(sessions);
+
+        // Load first session if none selected
+        if (sessions.length > 0 && !this.currentSessionSubject.value) {
+          this.loadSession(sessions[0].id);
+        }
+      },
+      error: (err) => console.error('Failed to load threads', err)
+    });
   }
 
   getCurrentSession(): ChatSession | null {
@@ -35,17 +51,15 @@ export class ChatService {
   }
 
   createSession(title: string): Observable<ChatSession> {
-    const newSession: ChatSession = {
-      id: 'session-' + Date.now(),
-      userId: 'user-001',
-      title,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      messages: [],
-    };
-
-    return of(newSession).pipe(
-      delay(300),
+    return this.http.post<any>(`${this.apiUrl}/threads`, { title }).pipe(
+      map(t => ({
+        id: t.id,
+        userId: 'current-user',
+        title: t.title,
+        createdAt: new Date(t.created_at),
+        updatedAt: new Date(t.updated_at),
+        messages: []
+      })),
       tap((session) => {
         const sessions = this.sessionsSubject.value;
         sessions.unshift(session);
@@ -56,48 +70,50 @@ export class ChatService {
   }
 
   sendMessage(request: ChatMessageRequest): Observable<ChatMessageResponse> {
-    // Mock response logic based on keywords
-    const lowerMessage = request.message.toLowerCase();
-    let selectedResponse: MockResponse;
+    const currentSession = this.currentSessionSubject.value;
+    let threadId = currentSession?.id;
 
-    if (lowerMessage.includes('cotiz') || lowerMessage.includes('precio') || lowerMessage.includes('costo')) {
-      selectedResponse = quotationResponses[Math.floor(Math.random() * quotationResponses.length)];
-    } else if (lowerMessage.includes('compar') || lowerMessage.includes('diferencia') || lowerMessage.includes('vs')) {
-      selectedResponse = comparisonResponses[Math.floor(Math.random() * comparisonResponses.length)];
-    } else if (lowerMessage.includes('cobert') || lowerMessage.includes('cubre') || lowerMessage.includes('exclu')) {
-      // Mix of direct text answers or comparison tables for coverage/exclusions
-      const options = [...directResponses, ...comparisonResponses];
-      selectedResponse = options[Math.floor(Math.random() * options.length)];
-    } else {
-      // Default to a direct text answer if no specific keyword
-      selectedResponse = directResponses[Math.floor(Math.random() * directResponses.length)];
-    }
+    // If no session exists, create one first? 
+    // Ideally UI should handle this, but let's assume session exists or thread_id is null for new.
+    // However, our backend /chat endpoint takes thread_id.
 
-    const response: ChatMessageResponse = {
-      id: 'msg-' + Date.now(),
-      content: selectedResponse.content,
+    // Optimistic UI update for User Message
+    const userMsg = {
+      id: 'temp-user-' + Date.now(),
+      content: request.message,
+      role: 'user' as const,
       timestamp: new Date(),
-      comparisonResult: selectedResponse.type === 'table' ? {
-        id: 'comp-' + Date.now(),
-        query: request.message,
-        timestamp: new Date(),
-        quotes: [],
-        comparativeTable: selectedResponse.tableData
-      } : undefined,
+      status: 'sending' as const,
     };
 
-    return of(response).pipe(
-      delay(1200),
+    // Update local state immediately
+    if (currentSession) {
+      currentSession.messages = [...currentSession.messages, userMsg];
+      this.currentSessionSubject.next({ ...currentSession });
+    }
+
+    const payload = {
+      message: request.message,
+      thread_id: threadId
+    };
+
+    return this.http.post<any>(`${this.apiUrl}/chat`, payload).pipe(
+      map(response => {
+        // Return formatted response
+        return {
+          id: 'msg-' + Date.now(),
+          content: response.answer,
+          timestamp: new Date(),
+          // Comparison/Table data parsing if needed
+          comparisonResult: undefined // TODO: Parse sources/data_table if backend sends it
+        } as ChatMessageResponse;
+      }),
       tap((msg) => {
+        // Update Session with Assistant Message
         const session = this.currentSessionSubject.value;
         if (session) {
-          const userMsg = {
-            id: 'msg-user-' + Date.now(),
-            content: request.message,
-            role: 'user' as const,
-            timestamp: new Date(),
-            status: 'sent' as const,
-          };
+          // Update user msg status
+          session.messages = session.messages.map(m => m.id === userMsg.id ? { ...m, status: 'sent' } : m);
 
           const assistantMsg = {
             id: msg.id,
@@ -105,30 +121,41 @@ export class ChatService {
             role: 'assistant' as const,
             timestamp: msg.timestamp,
             status: 'sent' as const,
-            metadata: {
-              type: selectedResponse.type,
-              data: selectedResponse.tableData,
-            },
+            // metadata...
           };
 
-          session.messages = [...session.messages, userMsg, assistantMsg];
-          session.updatedAt = new Date();
+          session.messages.push(assistantMsg);
           this.currentSessionSubject.next({ ...session });
 
-          const sessions = this.sessionsSubject.value.map((s) =>
-            s.id === session.id ? session : s
-          );
-          this.sessionsSubject.next([...sessions]);
+          // Refresh threads list order logic if needed
+        } else {
+          // Case where we started without a session (if supported)
+          // We should reload sessions to get the new one created by backend if we passed null thread_id
+          this.loadSessions();
         }
       })
     );
   }
 
   loadSession(sessionId: string): void {
-    const session = this.sessionsSubject.value.find((s) => s.id === sessionId);
-    if (session) {
-      this.currentSessionSubject.next(session);
-    }
+    // Check if we have messages loaded? 
+    // Always fetch latest messages
+    this.http.get<any[]>(`${this.apiUrl}/threads/${sessionId}/messages`).subscribe({
+      next: (msgs) => {
+        const session = this.sessionsSubject.value.find(s => s.id === sessionId);
+        if (session) {
+          session.messages = msgs.map(m => ({
+            id: m.id,
+            content: m.content,
+            role: m.role as 'user' | 'assistant',
+            timestamp: new Date(m.created_at),
+            status: 'sent'
+          }));
+          this.currentSessionSubject.next({ ...session });
+        }
+      },
+      error: (err) => console.error('Error loading messages', err)
+    });
   }
 
   getSessions(): ChatSession[] {
@@ -136,7 +163,7 @@ export class ChatService {
   }
 
   deleteSession(sessionId: string): Observable<void> {
-    return of(void 0).pipe(
+    return this.http.delete<void>(`${this.apiUrl}/threads/${sessionId}`).pipe(
       tap(() => {
         const sessions = this.sessionsSubject.value.filter((s) => s.id !== sessionId);
         this.sessionsSubject.next([...sessions]);
@@ -144,6 +171,28 @@ export class ChatService {
         const currentSession = this.currentSessionSubject.value;
         if (currentSession?.id === sessionId) {
           this.currentSessionSubject.next(sessions.length > 0 ? sessions[0] : null);
+          if (sessions.length > 0) {
+            this.loadSession(sessions[0].id);
+          }
+        }
+      })
+    );
+  }
+
+  renameSession(sessionId: string, newTitle: string): Observable<void> {
+    return this.http.put<void>(`${this.apiUrl}/threads/${sessionId}`, { title: newTitle }).pipe(
+      tap(() => {
+        const sessions = this.sessionsSubject.value.map((s) => {
+          if (s.id === sessionId) {
+            return { ...s, title: newTitle, updatedAt: new Date() };
+          }
+          return s;
+        });
+        this.sessionsSubject.next([...sessions]);
+
+        const currentSession = this.currentSessionSubject.value;
+        if (currentSession?.id === sessionId) {
+          this.currentSessionSubject.next({ ...currentSession, title: newTitle });
         }
       })
     );

@@ -3,11 +3,13 @@ import uuid
 from sqlalchemy.ext.asyncio import AsyncSession
 from langchain_core.tools import tool
 from langchain_openai import ChatOpenAI
-from langchain.agents import create_agent
+
 from psycopg_pool import AsyncConnectionPool
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
+from langgraph.prebuilt import create_react_agent
 from ..services.quote_service import QuoteService
 from ..services.rag_service import RAGService
+from ..services.chat_service import ChatService
 from ..domain.schemas import QuoteRequest
 from ..core.config import settings
 
@@ -28,6 +30,7 @@ class AgentService:
         # Instanciar servicios base
         self.quote_service = QuoteService(db)
         self.rag_service = RAGService(db)
+        self.chat_service = ChatService(db)
 
     async def get_checkpointer(self):
         """
@@ -55,10 +58,7 @@ class AgentService:
         # 0. Obtener Checkpointer
         checkpointer = await self.get_checkpointer()
 
-        # 1. Definir Herramientas (Tools) 
-        # El LLM usará los docstrings para saber cuándo invocar cada una.
-        # "tool" decorator transforma la función en una estructura que OpenAI entiende.
-
+        # 1. Definir Tools (re-defining here to ensure they are in scope)
         @tool
         async def calculate_insurance_quote(age: int, car_brand: str, car_model: str, car_year: int, dni: str = None, first_name: str = None, usage: str = "Particular") -> str:
             """
@@ -94,22 +94,21 @@ class AgentService:
             return await self.rag_service.answer_legal_query(query)
 
         tools = [calculate_insurance_quote, search_legal_conditions]
-
-        # 2. Definir Prompt del Sistema
+        
+        # 2. Definir Prompt
         system_prompt = """Eres el Copiloto de Seguros Inteligente.
             Tu misión es ayudar al usuario usando las herramientas disponibles.
             
             REGLAS:
-            - Si el usuario saludas, responde amablemente.
+            - Si el usuario saluda, responde amablemente.
             - Si pide PRECIO, usa 'calculate_insurance_quote'. Si faltan datos (edad, auto), PREGUNTALOS antes de llamar a la herramienta.
             - Si pregunta CONDICIONES, usa 'search_legal_conditions'.
             - Si pregunta AMBAS cosas, usa AMBAS herramientas.
             """
 
-        # 3. Crear Agente (usando la nueva API de LangChain 1.2.8 / LangGraph)
-        # We pass 'memory' as the checkpointer to persist state between turns
-        agent = create_agent(self.llm, tools, system_prompt=system_prompt, checkpointer=checkpointer, debug=True)
-        
+        # 3. Crear Agente LangGraph
+        # Version 0.1.7 signature: (model, tools, *, prompt=None, ...)
+        agent = create_react_agent(self.llm, tools, prompt=system_prompt, checkpointer=checkpointer)
         return agent
 
     async def process_query(self, user_query: str, thread_id: str = None) -> dict:
@@ -117,26 +116,35 @@ class AgentService:
         Punto de entrada principal.
         Retorna tanto la respuesta como el thread_id usado.
         """
+        # 1. Thread Management & User Message Persistence
         if not thread_id:
-            thread_id = str(uuid.uuid4())
-            
-        # Nota: get_executor ahora es async porque inicializa el checkpointer
+            # Create new thread logic. Assuming a default user_id or system user for now.
+            # Ideally, user_id comes from context/auth.
+            user_id = 1 # Placeholder/Default user
+            thread = await self.chat_service.create_thread(user_id, "Nueva Conversación")
+            thread_id = thread.id
+        
+        # Save User Message
+        await self.chat_service.save_message(thread_id, "user", user_query)
+
+        # 2. Agent Execution
+        checkpointer = await self.get_checkpointer() # Ensure checkpointer initialized
         agent_graph = await self.get_executor()
         
-        # La nueva API espera mensajes en formato lista de diccionarios o objetos Message
-        inputs = {"messages": [{"role": "user", "content": user_query}]}
-        
-        # Configuración para usar el checkpointer con el thread específico
         config = {"configurable": {"thread_id": thread_id}}
+        inputs = {"messages": [("user", user_query)]}
         
-        # ainvoke devuelve el estado final
+        # Invoke agent
         result = await agent_graph.ainvoke(inputs, config=config)
         
-        # Extraemos el último mensaje que debería ser la respuesta del asistente
+        # 3. Agent Response Persistence
         messages = result["messages"]
         last_message = messages[-1]
+        answer_content = last_message.content
         
+        await self.chat_service.save_message(thread_id, "assistant", answer_content)
+
         return {
-            "answer": last_message.content,
+            "answer": answer_content,
             "thread_id": thread_id
         }

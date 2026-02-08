@@ -8,10 +8,37 @@ class User(Base):
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, index=True)
-    username = Column(String, unique=True, index=True)
+    username = Column(String, unique=True, index=True, nullable=True)
+    email = Column(String, unique=True, index=True)
     password_hash = Column(String)
     role = Column(String, default="viewer")
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    threads = relationship("ChatThread", back_populates="user")
+
+class ChatThread(Base):
+    __tablename__ = "chat_threads"
+
+    id = Column(String, primary_key=True, index=True) # UUID
+    user_id = Column(Integer, ForeignKey("users.id"))
+    title = Column(String)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    user = relationship("User", back_populates="threads")
+    messages = relationship("ChatMessage", back_populates="thread", cascade="all, delete-orphan")
+
+class ChatMessage(Base):
+    __tablename__ = "chat_messages"
+
+    id = Column(String, primary_key=True, index=True) # UUID
+    thread_id = Column(String, ForeignKey("chat_threads.id"))
+    role = Column(String) # user, assistant
+    content = Column(Text)
+    metadata_json = Column(JSON, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    thread = relationship("ChatThread", back_populates="messages")
 
 class Policy(Base):
     """
@@ -82,13 +109,15 @@ class Quote(Base):
     customer_age = Column(Integer)
     car_brand = Column(String) 
     car_model = Column(String)
+    car_type = Column(String)
+    car_usage = Column(String)
     car_year = Column(Integer)
-    usage = Column(String)
     
     # Resultado
     selected_insurer = Column(String)
     selected_plan = Column(String)
     final_price = Column(Float)
+    status = Column(String, default="pending")  # pending, accepted, rejected
     
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     

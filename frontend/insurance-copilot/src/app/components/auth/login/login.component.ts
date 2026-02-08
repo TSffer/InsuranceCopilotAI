@@ -1,8 +1,9 @@
 import { Component, Output, EventEmitter } from '@angular/core';
+import { Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { AuthService } from '../../../services/auth.service';
-import { AuthRequest } from '../../../shared/models/types';
+import { AuthService } from '@/app/services/auth.service';
+import { AuthRequest } from '@/app/shared/models/types';
 
 @Component({
   selector: 'app-login',
@@ -47,13 +48,12 @@ import { AuthRequest } from '../../../shared/models/types';
             required
           />
         </div>
-
-        <div
-          *ngIf="error"
-          class="p-3 rounded-lg bg-destructive/10 border border-destructive/30 text-sm text-destructive"
-        >
-          {{ error }}
-        </div>
+      
+        @if(error) {
+          <div class="p-3 rounded-lg bg-destructive/10 border border-destructive/30 text-sm text-destructive">
+            {{ error }}
+          </div>
+        }
 
         <button
           type="submit"
@@ -75,8 +75,7 @@ import { AuthRequest } from '../../../shared/models/types';
         </div>
       </div>
 
-      <button
-        (click)="onSwitchToRegister.emit()"
+      <button (click)="onSwitchToRegister.emit()"
         class="w-full py-3 px-4 rounded-lg border border-primary bg-transparent text-primary font-semibold hover:bg-primary/5 transition-colors"
       >
         Crear Nueva Cuenta
@@ -103,7 +102,7 @@ export class LoginComponent {
   loading = false;
   error: string | null = null;
 
-  constructor(private authService: AuthService) {}
+  constructor(private authService: AuthService, private router: Router) { }
 
   handleSubmit(): void {
     this.loading = true;
@@ -117,9 +116,10 @@ export class LoginComponent {
       .subscribe({
         next: () => {
           this.loading = false;
+          this.router.navigate(['/chat']); // Adjust route as needed
         },
         error: (err: any) => {
-          this.error = err.message || 'Error al iniciar sesión';
+          this.error = err.error?.detail || 'Error al iniciar sesión';
           this.loading = false;
         },
       });

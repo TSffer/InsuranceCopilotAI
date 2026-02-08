@@ -1,6 +1,6 @@
 import { Component, Input } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { Message, ComparisonTableRow } from '../../../shared/models/types';
+import { Message, ComparisonTableRow } from '@/app/shared/models/types';
 
 @Component({
   selector: 'app-chat-message',
@@ -74,6 +74,11 @@ import { Message, ComparisonTableRow } from '../../../shared/models/types';
       </div>
     </div>
   `,
+  styles: [`
+    :host {
+      display: block;
+    }
+  `]
 })
 export class ChatMessageComponent {
   @Input() message!: Message;

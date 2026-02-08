@@ -35,11 +35,21 @@ class QuoteService:
             customer_id = customer.id
 
         # 2. Buscar tasas que coincidan con el vehículo
+        # Normalizar datos desde flatten o nested
+        car_brand = request.car_brand
+        car_model = request.car_model
+        car_year = request.car_year
+        
+        if request.vehicle:
+            car_brand = request.vehicle.get('brand', car_brand)
+            car_model = request.vehicle.get('model', car_model)
+            car_year = request.vehicle.get('year', car_year)
+            
         stmt = select(Rate).where(
-            (Rate.brand.ilike(request.car_brand)) &
-            (Rate.model.ilike(request.car_model)) &
-            (Rate.year_min <= request.car_year) &
-            (Rate.year_max >= request.car_year) &
+            (Rate.brand.ilike(car_brand)) &
+            (Rate.model.ilike(car_model)) &
+            (Rate.year_min <= car_year) &
+            (Rate.year_max >= car_year) &
             (Rate.usage.ilike(request.usage))
         )
         
@@ -64,13 +74,14 @@ class QuoteService:
             new_quote = Quote(
                 customer_id=customer_id,
                 customer_age=request.age,
-                car_brand=request.car_brand,
-                car_model=self.normalize_text(request.car_model),
-                car_year=request.car_year,
+                car_brand=car_brand,
+                car_model=self.normalize_text(car_model),
+                car_year=car_year,
                 usage=request.usage,
                 selected_insurer=rate.insurer,
                 selected_plan=rate.plan_name,
-                final_price=round(final_price, 2)
+                final_price=round(final_price, 2),
+                status="generated"
             )
             self.db.add(new_quote)
             

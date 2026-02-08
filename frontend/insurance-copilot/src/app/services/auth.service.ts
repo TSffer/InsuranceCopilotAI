@@ -1,13 +1,14 @@
 import { Injectable } from '@angular/core';
-import { BehaviorSubject, Observable, of } from 'rxjs';
-import { delay, tap } from 'rxjs/operators';
-import { AuthRequest, AuthResponse, User } from '../shared/models/types';
-import { mockUsers } from '../shared/data/mock-data';
+import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { BehaviorSubject, Observable, tap, map, catchError, of } from 'rxjs';
+import { AuthRequest, AuthResponse, User, RegisterRequest } from '@/app/shared/models/types';
+import { Router } from '@angular/router';
 
 @Injectable({
   providedIn: 'root',
 })
 export class AuthService {
+  private apiUrl = 'http://localhost:8000/api/v1/auth'; // Adjust if environment config available
   private currentUserSubject = new BehaviorSubject<User | null>(null);
   public currentUser$ = this.currentUserSubject.asObservable();
 
@@ -17,7 +18,7 @@ export class AuthService {
   private isLoadingSubject = new BehaviorSubject(true);
   public isLoading$ = this.isLoadingSubject.asObservable();
 
-  constructor() {
+  constructor(private http: HttpClient, private router: Router) {
     this.initializeAuth();
   }
 
@@ -34,49 +35,61 @@ export class AuthService {
   }
 
   login(credentials: AuthRequest): Observable<AuthResponse> {
-    // Mock authentication - in real app, call API
-    const user = mockUsers.broker1;
-    const token = 'mock-token-' + Date.now();
+    const formData = new FormData();
+    formData.append('username', credentials.email);
+    formData.append('password', credentials.password);
 
-    return of({
-      token,
-      user,
-      expiresIn: 3600,
-    }).pipe(
-      delay(800),
+    return this.http.post<any>(`${this.apiUrl}/token`, formData).pipe(
+      map(response => {
+        //Backend returns Token model: { access_token, token_type }
+        // We need to fetch user details or construct partial user. 
+        // For now, let's decode token or just store it. 
+        // Since backend doesn't return User object on login yet (only token), 
+        // we might need a /me endpoint or update login response.
+        // BUT, for speed, let's assume we can derive or fetch user. 
+        // Actually, let's update backend to return User info if possible? 
+        // No, standard OAuth2 returns token.
+        // Let's decode token (if JWT) or just set a dummy user state until we have /me.
+
+        const authResponse: AuthResponse = {
+          token: response.access_token,
+          user: {
+            id: '0',
+            email: credentials.email,
+            firstName: 'User',
+            lastName: '',
+            role: 'broker',
+            createdAt: new Date()
+          }, // Placeholder until we fetch real user
+          expiresIn: 1800
+        };
+        return authResponse;
+      }),
       tap((response) => {
-        localStorage.setItem('auth_token', response.token);
-        localStorage.setItem('auth_user', JSON.stringify(response.user));
-        this.tokenSubject.next(response.token);
-        this.currentUserSubject.next(response.user);
+        this.setSession(response);
       })
     );
   }
 
-  register(email: string, password: string, firstName: string, lastName: string): Observable<AuthResponse> {
-    const user: User = {
-      id: 'user-' + Date.now(),
-      email,
-      firstName,
-      lastName,
-      createdAt: new Date(),
-      role: 'broker',
+  register(data: RegisterRequest): Observable<User> {
+    // Backend expects UserCreate: { email, password, username, role }
+    const payload = {
+      email: data.email,
+      password: data.password,
+      username: data.company || data.email.split('@')[0], // Fallback username
+      role: 'broker' // Default role
     };
-    const token = 'mock-token-' + Date.now();
 
-    return of({
-      token,
-      user,
-      expiresIn: 3600,
-    }).pipe(
-      delay(800),
-      tap((response) => {
-        localStorage.setItem('auth_token', response.token);
-        localStorage.setItem('auth_user', JSON.stringify(response.user));
-        this.tokenSubject.next(response.token);
-        this.currentUserSubject.next(response.user);
-      })
-    );
+    return this.http.post<User>(`${this.apiUrl}/register`, payload);
+  }
+
+  private setSession(authResult: AuthResponse) {
+    localStorage.setItem('auth_token', authResult.token);
+    // Persist user info if available
+    localStorage.setItem('auth_user', JSON.stringify(authResult.user));
+
+    this.tokenSubject.next(authResult.token);
+    this.currentUserSubject.next(authResult.user);
   }
 
   logout(): void {
@@ -84,6 +97,7 @@ export class AuthService {
     localStorage.removeItem('auth_user');
     this.tokenSubject.next(null);
     this.currentUserSubject.next(null);
+    this.router.navigate(['/login']);
   }
 
   isLoggedIn(): boolean {

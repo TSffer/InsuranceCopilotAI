@@ -1,7 +1,7 @@
 import { Component, Output, EventEmitter } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { AuthService } from '../../../services/auth.service';
+import { AuthService } from '@/app/services/auth.service';
 
 @Component({
   selector: 'app-register',
@@ -79,12 +79,11 @@ import { AuthService } from '../../../services/auth.service';
           />
         </div>
 
-        <div
-          *ngIf="error"
-          class="p-3 rounded-lg bg-destructive/10 border border-destructive/30 text-sm text-destructive"
-        >
-          {{ error }}
-        </div>
+        @if(error) {
+          <div class="p-3 rounded-lg bg-destructive/10 border border-destructive/30 text-sm text-destructive">
+            {{ error }}
+          </div>
+        }
 
         <button
           type="submit"
@@ -114,7 +113,7 @@ export class RegisterComponent {
   loading = false;
   error: string | null = null;
 
-  constructor(private authService: AuthService) {}
+  constructor(private authService: AuthService) { }
 
   handleSubmit(): void {
     if (!this.firstName || !this.lastName || !this.email || !this.password) {
@@ -125,12 +124,21 @@ export class RegisterComponent {
     this.loading = true;
     this.error = null;
 
-    this.authService.register(this.email, this.password, this.firstName, this.lastName).subscribe({
+    const registerData = {
+      email: this.email,
+      password: this.password,
+      firstName: this.firstName,
+      lastName: this.lastName
+    };
+
+    this.authService.register(registerData).subscribe({
       next: () => {
         this.loading = false;
+        // Optional: Auto login or redirect to login
+        this.onSwitchToLogin.emit();
       },
       error: (err: any) => {
-        this.error = err.message || 'Error al crear la cuenta';
+        this.error = err.error?.detail || 'Error al crear la cuenta';
         this.loading = false;
       },
     });
