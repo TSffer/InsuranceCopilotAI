@@ -2,10 +2,10 @@ import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { CommonModule } from '@angular/common';
 
 @Component({
-    selector: 'app-confirmation-modal',
-    standalone: true,
-    imports: [CommonModule],
-    template: `
+  selector: 'app-confirmation-modal',
+  standalone: true,
+  imports: [CommonModule],
+  template: `
     <div *ngIf="isOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fadeIn">
       <!-- Backdrop -->
       <div class="absolute inset-0 bg-black/40 backdrop-blur-sm transition-opacity" (click)="onCancel.emit()"></div>
@@ -30,7 +30,7 @@ import { CommonModule } from '@angular/common';
         </div>
 
         <!-- Footer -->
-        <div class="p-6 flex justify-end gap-3">
+        <div class="p-6 flex justify-center gap-3">
           <button
             (click)="onCancel.emit()"
             class="px-4 py-2 rounded-xl text-sm font-medium text-foreground hover:bg-muted transition-colors"
@@ -47,7 +47,7 @@ import { CommonModule } from '@angular/common';
       </div>
     </div>
   `,
-    styles: [`
+  styles: [`
     @keyframes fadeIn {
       from { opacity: 0; }
       to { opacity: 1; }
@@ -58,12 +58,12 @@ import { CommonModule } from '@angular/common';
   `]
 })
 export class ConfirmationModalComponent {
-    @Input() isOpen = false;
-    @Input() title = 'Confirmar acción';
-    @Input() message = '¿Estás seguro de que deseas continuar?';
-    @Input() confirmText = 'Confirmar';
-    @Input() cancelText = 'Cancelar';
+  @Input() isOpen = false;
+  @Input() title = 'Confirmar acción';
+  @Input() message = '¿Estás seguro de que deseas continuar?';
+  @Input() confirmText = 'Confirmar';
+  @Input() cancelText = 'Cancelar';
 
-    @Output() onConfirm = new EventEmitter<void>();
-    @Output() onCancel = new EventEmitter<void>();
+  @Output() onConfirm = new EventEmitter<void>();
+  @Output() onCancel = new EventEmitter<void>();
 }

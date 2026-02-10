@@ -1,3 +1,9 @@
+import sys
+import asyncio
+
+if sys.platform == "win32":
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
 from src.core.config import settings
@@ -9,13 +15,17 @@ from sqlalchemy import text
 # Lifecycle event para inicializar DB (solo dev)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Paso 1: Intentar habilitar la extensión vector (en una transacción propia)
+    # Paso 1: Extension 'vector' removed (using Qdrant)
+    loop = asyncio.get_running_loop()
+
+    # Initialize Checkpointer (AsyncPostgresSaver)
+    from src.services.agent_service import initialize_checkpointer
     try:
-        async with engine.begin() as conn:
-            await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
-            print("INFO: Extension 'vector' enabled/verified.")
+        await initialize_checkpointer()
     except Exception as e:
-        print(f"WARNING: Could not enable 'vector' extension. Ensure your Postgres has pgvector installed. Error: {e}")
+        print(f"ERROR: Could not initialize checkpointer: {e}")
+        # We might want to raise here if it's critical, or just log
+        # raise e
 
     # Paso 2: Crear tablas
     # En producción usaríamos Alembic para migraciones.
@@ -23,7 +33,6 @@ async def lifespan(app: FastAPI):
         # await conn.run_sync(Base.metadata.drop_all) # Descomentar para resetear
         try:
             await conn.run_sync(Base.metadata.create_all)
-            print("INFO: Tables created successfully.")
         except Exception as e:
             print(f"ERROR: Could not create tables. {e}")
             raise e
@@ -35,11 +44,14 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-from src.api.endpoints import chat, quote, auth
+from src.api.endpoints import chat, auth, ingest, quote
 
 from fastapi.middleware.cors import CORSMiddleware
 
+# Routers
+app.include_router(auth.router, prefix="/api/v1", tags=["auth"])
 app.include_router(chat.router, prefix=settings.API_V1_STR, tags=["chat"])
+app.include_router(ingest.router, prefix=f"{settings.API_V1_STR}/ingest", tags=["ingestion"])
 app.include_router(quote.router, prefix=f"{settings.API_V1_STR}/quotes", tags=["quotes"])
 app.include_router(auth.router, prefix=f"{settings.API_V1_STR}/auth", tags=["auth"])
 

@@ -18,18 +18,41 @@ from ..core.config import settings
 _pool: AsyncConnectionPool = None
 _checkpointer: AsyncPostgresSaver = None
 
+
+async def initialize_checkpointer():
+    global _pool, _checkpointer
+    if _pool is None:
+        # PostgresSaver needs autocommit=True for the initial setup (migrations)
+        # because some operations (like CREATE INDEX CONCURRENTLY) cannot run in a transaction block.
+        try:
+            _pool = AsyncConnectionPool(
+                conninfo=settings.POSTGRES_CONNECTION_URI, 
+                open=False,
+                kwargs={"autocommit": True}
+            )
+            await _pool.open()
+        except Exception as e:
+            # print(f"DEBUG: Error opening pool: {e}")
+            raise e
+        
+    if _checkpointer is None:
+        _checkpointer = AsyncPostgresSaver(_pool)
+        await _checkpointer.setup()
+        
+    return _checkpointer
+
 class AgentService:
     def __init__(self, db: AsyncSession):
         self.db = db
         self.llm = ChatOpenAI(
-            model="gpt-4o", 
+            model="gpt-4o-mini", 
             temperature=0, 
             api_key=settings.OPENAI_API_KEY
         )
         
         # Instanciar servicios base
         self.quote_service = QuoteService(db)
-        self.rag_service = RAGService(db)
+        self.rag_service = RAGService()
         self.chat_service = ChatService(db)
 
     async def get_checkpointer(self):
@@ -37,22 +60,7 @@ class AgentService:
         Singleton lazy initialization of AsyncPostgresSaver.
         Ensures setup() is called once to create tables.
         """
-        global _pool, _checkpointer
-        if _pool is None:
-            # PostgresSaver needs autocommit=True for the initial setup (migrations)
-            # because some operations (like CREATE INDEX CONCURRENTLY) cannot run in a transaction block.
-            _pool = AsyncConnectionPool(
-                conninfo=settings.POSTGRES_CONNECTION_URI, 
-                open=False,
-                kwargs={"autocommit": True}
-            )
-            await _pool.open()
-            
-        if _checkpointer is None:
-            _checkpointer = AsyncPostgresSaver(_pool)
-            await _checkpointer.setup()
-            
-        return _checkpointer
+        return await initialize_checkpointer()
 
     async def get_executor(self) -> Any:
         # 0. Obtener Checkpointer
@@ -111,16 +119,13 @@ class AgentService:
         agent = create_react_agent(self.llm, tools, prompt=system_prompt, checkpointer=checkpointer)
         return agent
 
-    async def process_query(self, user_query: str, thread_id: str = None) -> dict:
+    async def process_query(self, user_query: str, user_id: int, thread_id: str = None) -> dict:
         """
         Punto de entrada principal.
         Retorna tanto la respuesta como el thread_id usado.
         """
         # 1. Thread Management & User Message Persistence
         if not thread_id:
-            # Create new thread logic. Assuming a default user_id or system user for now.
-            # Ideally, user_id comes from context/auth.
-            user_id = 1 # Placeholder/Default user
             thread = await self.chat_service.create_thread(user_id, "Nueva Conversación")
             thread_id = thread.id
         

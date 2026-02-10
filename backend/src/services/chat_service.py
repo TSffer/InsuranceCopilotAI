@@ -18,12 +18,14 @@ class ChatService:
         )
         self.db.add(new_thread)
         await self.db.commit()
-        # Refresh columns (id, created_at, updated_at) to populate server defaults
-        await self.db.refresh(new_thread)
-        # Manually set messages to empty list to avoid MissingGreenlet on Pydantic validation
-        # (Since it's a new thread, we know it has no messages yet)
-        new_thread.messages = []
-        return new_thread
+        
+        # Re-fetch with eager loading to avoid MissingGreenlet
+        result = await self.db.execute(
+            select(ChatThread)
+            .where(ChatThread.id == new_thread.id)
+            .options(selectinload(ChatThread.messages))
+        )
+        return result.scalars().one()
 
     async def get_user_threads(self, user_id: int) -> list[ChatThread]:
         result = await self.db.execute(

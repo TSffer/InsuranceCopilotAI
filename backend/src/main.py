@@ -9,13 +9,7 @@ from sqlalchemy import text
 # Lifecycle event para inicializar DB (solo dev)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Paso 1: Intentar habilitar la extensión vector (en una transacción propia)
-    try:
-        async with engine.begin() as conn:
-            await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
-            print("INFO: Extension 'vector' enabled/verified.")
-    except Exception as e:
-        print(f"WARNING: Could not enable 'vector' extension. Ensure your Postgres has pgvector installed. Error: {e}")
+    # Paso 1: Extension 'vector' removed (using Qdrant)
 
     # Paso 2: Crear tablas
     # En producción usaríamos Alembic para migraciones.

@@ -13,6 +13,17 @@ class Settings(BaseSettings):
     POSTGRES_PORT: int
     POSTGRES_DB: str
 
+    # QDRANT
+    QDRANT_URL: str = "http://localhost:6333"
+    QDRANT_API_KEY: Optional[str] = None
+    QDRANT_COLLECTION_NAME: str = "policies"
+
+    # RAG
+    ENABLE_QUERY_EXPANSION: bool = True
+    ENABLE_RERANKING: bool = True
+    ENABLE_HYBRID_SEARCH: bool = True
+    RERANK_MODEL: str = "ms-marco-MultiBERT-L-12"
+
     # AI
     OPENAI_API_KEY: str
 

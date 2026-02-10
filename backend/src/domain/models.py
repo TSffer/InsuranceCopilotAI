@@ -1,7 +1,7 @@
 from sqlalchemy import Column, Integer, String, Float, ForeignKey, Text, DateTime, JSON
 from sqlalchemy.orm import relationship, Mapped, mapped_column
 from sqlalchemy.sql import func
-from pgvector.sqlalchemy import Vector
+
 from ..core.database import Base
 
 class User(Base):
@@ -55,8 +55,9 @@ class Policy(Base):
     base_price = Column(Float) 
     
     # Contenido para RAG
+    # Contenido para RAG
     content_text = Column(Text)
-    embedding = mapped_column(Vector(1536))
+    # embedding column removed (now using Qdrant)
     
     metadata_json = Column(JSON)
 
