@@ -3,7 +3,7 @@ from sqlalchemy import select
 from fastapi import HTTPException, status
 from ..domain.models import User
 from ..domain.schemas import UserCreate, Token
-from ..core.security import get_password_hash, verify_password, create_access_token
+from ..core.security import get_password_hash, verify_password, create_access_token, create_refresh_token
 
 class AuthService:
     def __init__(self, db: AsyncSession):
@@ -53,5 +53,6 @@ class AuthService:
             )
             
         access_token = create_access_token(subject=user.email)
-        print("DEBUG: Token created successfully")
-        return Token(access_token=access_token, token_type="bearer")
+        refresh_token = create_refresh_token(subject=user.email)
+        print("DEBUG: Tokens created successfully")
+        return Token(access_token=access_token, refresh_token=refresh_token, token_type="bearer")

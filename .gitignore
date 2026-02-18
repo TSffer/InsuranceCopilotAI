@@ -10,3 +10,6 @@ wheels/
 .venv
 backend/.env
 backend/uv.lock
+
+# Data
+backend/data

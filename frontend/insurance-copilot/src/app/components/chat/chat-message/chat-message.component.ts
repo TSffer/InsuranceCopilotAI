@@ -1,11 +1,12 @@
 import { Component, Input } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Message, ComparisonTableRow } from '@/app/shared/models/types';
+import { MarkdownModule } from 'ngx-markdown';
 
 @Component({
   selector: 'app-chat-message',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, MarkdownModule],
   template: `
     <div class="flex gap-4 animate-fadeIn group" [ngClass]="message.role === 'user' ? 'justify-end' : 'justify-start'">
       <!-- Assistant Avatar -->
@@ -25,37 +26,20 @@ import { Message, ComparisonTableRow } from '@/app/shared/models/types';
             : 'bg-white/80 dark:bg-card/80 backdrop-blur-sm border border-border/50 text-foreground rounded-2xl rounded-tl-sm shadow-sm'
         "
       >
-        <!-- Text content -->
-        <div class="px-5 py-3.5 text-sm leading-relaxed text-pretty">
-          {{ message.content }}
+        <!-- Text/Markdown content -->
+        <div class="px-5 py-3.5">
+          <markdown 
+            [data]="message.content" 
+            class="markdown-body block"
+          ></markdown>
         </div>
 
-        <!-- Table content -->
-        <div
-          *ngIf="message.metadata?.type === 'table' && tableData"
-          class="px-2 pb-2 block"
-        >
-          <div class="overflow-hidden rounded-xl border border-border/40 bg-background/50 backdrop-blur-sm">
-            <div class="overflow-x-auto">
-              <table class="w-full text-xs">
-                <thead>
-                  <tr class="border-b border-border/50 bg-muted/30">
-                    <th class="text-left px-4 py-3 font-semibold text-muted-foreground uppercase tracking-wider text-[10px]">Aseguradora</th>
-                    <th class="text-left px-4 py-3 font-semibold text-muted-foreground uppercase tracking-wider text-[10px]">Prima</th>
-                    <th class="text-left px-4 py-3 font-semibold text-muted-foreground uppercase tracking-wider text-[10px]">Cobertura</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr *ngFor="let row of tableData" class="border-b border-border/40 last:border-0 hover:bg-muted/30 transition-colors">
-                    <td class="px-4 py-3 font-medium">{{ row.insurer }}</td>
-                    <td class="px-4 py-3 font-mono text-primary">{{ row.premium }}</td>
-                    <td class="px-4 py-3 text-muted-foreground">{{ row.coverage }}</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
+        <!-- Keeping existing Table content logic for Quotes/Specific structured data if needed, 
+             but now the MAIN content is markdown which handles comparisons perfectly. 
+             If message.metadata.type is 'table', we might prevent duplication if backend sends BOTH text and table data.
+             But current backend workflow sends response as TEXT (Markdown Table). 
+             So we just render content. 
+        -->
         
         <div *ngIf="message.role === 'assistant'" class="absolute -bottom-5 left-2 opacity-0 group-hover:opacity-100 transition-opacity text-[10px] text-muted-foreground">
            InsuroBot

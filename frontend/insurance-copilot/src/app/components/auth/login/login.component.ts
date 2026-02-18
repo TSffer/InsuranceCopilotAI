@@ -1,4 +1,4 @@
-import { Component, Output, EventEmitter } from '@angular/core';
+import { Component, Output, EventEmitter, ChangeDetectorRef } from '@angular/core';
 import { Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -102,7 +102,7 @@ export class LoginComponent {
   loading = false;
   error: string | null = null;
 
-  constructor(private authService: AuthService, private router: Router) { }
+  constructor(private authService: AuthService, private router: Router, private cdr: ChangeDetectorRef) { }
 
   handleSubmit(): void {
     this.loading = true;
@@ -119,8 +119,10 @@ export class LoginComponent {
           this.router.navigate(['/chat']); // Adjust route as needed
         },
         error: (err: any) => {
+          console.error('Login error:', err);
           this.error = err.error?.detail || 'Error al iniciar sesión';
           this.loading = false;
+          this.cdr.detectChanges();
         },
       });
   }

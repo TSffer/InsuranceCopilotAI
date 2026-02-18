@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from contextlib import asynccontextmanager
 from .core.config import settings
 from .core.database import engine, Base
-from .api.endpoints import chat
+from .api.endpoints import chat, router as router_endpoints
 
 from sqlalchemy import text
 
@@ -30,6 +30,7 @@ app = FastAPI(
 )
 
 app.include_router(chat.router, prefix=settings.API_V1_STR, tags=["chat"])
+app.include_router(router_endpoints.router, prefix=f"{settings.API_V1_STR}/router", tags=["router"])
 
 @app.get("/")
 async def root():

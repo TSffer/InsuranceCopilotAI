@@ -3,7 +3,6 @@ import os
 import sys
 from pypdf import PdfReader
 
-# Add src to path to allow imports
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../')))
 
 from src.services.ingestion_service import IngestionService
@@ -31,32 +30,43 @@ async def process_pdf(file_path: str, ingestion_service: IngestionService, insur
         print(f"Warning: No text extracted from {filename}")
         return
     
-    # Inferir metadatos del nombre de archivo: [ASEGURADORA]_[TIPO_PLAN]_[AÑO].pdf
+    # Inferir metadatos del nombre de archivo: [ASEGURADORA]_[RAMO]_[AÑO]_[TIPO_DOC]_[DESCRIPCION].pdf
+    # Ejemplo: Rimac_Vehicular_2026_Clausula Adicional_Auxilio Mecánico para Vehículos.pdf
     filename_clean = filename.replace(".pdf", "")
     parts = filename_clean.split("_")
     
+    # Valores por defecto
     insurer = insurer_folder.capitalize()
-    policy_type = "Generico"
-    year = "2024"
+    insurance_line = "Desconocido"
+    year = "Desconocido"
+    document_type = "Desconocido"
+    description = "Desconocido"
     
-    if len(parts) >= 2:
-        # Si tiene 2 partes: Rimac_TodoRiesgo
+    if len(parts) >= 5:
         insurer = parts[0]
-        policy_type = parts[1].replace("-", " ")
-        if len(parts) >= 3:
-            # Si tiene 3 partes: Rimac_TodoRiesgo_2024
-            year = parts[2]
+        insurance_line = parts[1]
+        year = parts[2]
+        document_type = parts[3]
+        description = "_".join(parts[4:])
+    elif len(parts) == 4:
+        # Fallback para casos con 4 partes
+        insurer = parts[0]
+        insurance_line = parts[1]
+        year = parts[2]
+        document_type = parts[3]
+        description = "-"
     else:
-        # Fallback basado en nombres comunes
-        if "riesgo" in filename.lower(): policy_type = "Todo Riesgo"
-        elif "terceros" in filename.lower(): policy_type = "Resp. Civil / Terceros"
+        print(f"Error: Filename {filename} no tiene el formato correcto.")
+        return
     
-    # Construir metadatos
+    # Construir metadatos extendidos
     metadata = {
         "source_file": filename,
         "insurer": insurer,
-        "policy_type": policy_type,
+        "insurance_line": insurance_line,
         "year": year,
+        "document_type": document_type,
+        "description": description,
         "file_path": file_path
     }
     

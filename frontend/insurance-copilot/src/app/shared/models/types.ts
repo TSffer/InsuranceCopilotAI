@@ -5,6 +5,7 @@ export interface AuthRequest {
 
 export interface AuthResponse {
   token: string;
+  refresh_token?: string;
   user: User;
   expiresIn: number;
 }

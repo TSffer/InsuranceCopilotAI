@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { BehaviorSubject, Observable, tap, map, of, switchMap } from 'rxjs';
+import { BehaviorSubject, Observable, tap, map, of, switchMap, catchError, throwError } from 'rxjs';
 import {
   ChatSession,
   ChatMessageRequest,
@@ -133,6 +133,31 @@ export class ChatService {
           // We should reload sessions to get the new one created by backend if we passed null thread_id
           this.loadSessions();
         }
+      }),
+      catchError((error) => {
+        console.error('Chat API Error:', error);
+
+        // Update Session with Error State
+        const session = this.currentSessionSubject.value;
+        if (session) {
+          // 1. Mark user message as error
+          session.messages = session.messages.map(m => m.id === userMsg.id ? { ...m, status: 'error' } : m);
+
+          // 2. Add System/Assistant Error Message
+          const errorMsg = {
+            id: 'err-' + Date.now(),
+            content: "❌ Lo siento, ocurrió un error en el servidor. Por favor intenta más tarde o reformula tu pregunta.",
+            role: 'assistant' as const,
+            timestamp: new Date(),
+            status: 'error' as const
+          };
+
+          session.messages.push(errorMsg);
+          this.currentSessionSubject.next({ ...session });
+        }
+
+        // Propagate error to component to stop isLoading
+        return throwError(() => error);
       })
     );
   }

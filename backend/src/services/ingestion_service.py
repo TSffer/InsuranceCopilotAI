@@ -51,6 +51,27 @@ class IngestionService:
                 sparse_vectors_config=sparse_vectors_config
             )
 
+        # Crear índices de payload para optimizar filtros
+        try:
+            self.qdrant.create_payload_index(
+                collection_name=self.collection_name,
+                field_name="insurer",
+                field_schema=models.PayloadSchemaType.KEYWORD
+            )
+            self.qdrant.create_payload_index(
+                collection_name=self.collection_name,
+                field_name="document_type",
+                field_schema=models.PayloadSchemaType.KEYWORD
+            )
+            self.qdrant.create_payload_index(
+                collection_name=self.collection_name,
+                field_name="description",
+                field_schema=models.PayloadSchemaType.TEXT
+            )
+            print("Índices de payload verificados/creados exitosamente.")
+        except Exception as e:
+            print(f"Advertencia al crear índices: {e}")
+
     async def get_embedding(self, text: str) -> list[float]:
         text = text.replace("\n", " ")
         response = await self.openai.embeddings.create(

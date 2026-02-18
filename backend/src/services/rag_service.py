@@ -50,7 +50,7 @@ class RAGService:
         
         try:
             response = await self.client.chat.completions.create(
-                model="gpt-4o",
+                model=settings.LLM_MODEL,
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": query}
@@ -92,11 +92,11 @@ class RAGService:
                 
             else:
                 # Dense only
-                results = self.qdrant.search(
+                results = self.qdrant.query_points(
                     collection_name=self.collection_name,
-                    query_vector=dense_vector,
+                    query=dense_vector,
                     limit=limit
-                )
+                ).points
 
             for res in results:
                 if res.payload:
@@ -134,7 +134,7 @@ class RAGService:
             
         return reranked_docs
 
-    async def answer_legal_query(self, query: str) -> str:
+    async def answer_legal_query(self, query: str, force_table: bool = False) -> str:
         # Pipeline execution
         queries = await self.expand_query(query)
         docs = await self.retrieve_documents(queries)
@@ -151,13 +151,33 @@ class RAGService:
             for d in docs
         ])
 
-        system_prompt = "Eres un experto en seguros. Responde usando SOLO el contexto. Cita la fuente."
+        system_prompt = """Eres un experto en seguros. Responde usando SOLO el contexto proporcionado.
+        - Resalta montos, porcentajes y monedas (USD, Soles).
+        - Cita la fuente del documento (ej: "Según Plan Km...").
+        """
+
+        if force_table:
+            system_prompt += """
+            - LA RESPUESTA DEBE SER EXCLUSIVAMENTE UNA TABLA MARKDOWN.
+            - NO uses listas con viñetas.
+            - NO uses párrafos introductorios ni conclusivos.
+            - Formato MARKDOWN puro.
+            
+            EJEMPLO:
+            | Característica | Rimac | Pacifico |
+            |---|---|---|
+            | Deducible | $150 | $200 |
+            """
         
+        user_content = f"Contexto:\n{context}\n\nPregunta: {query}"
+        if force_table:
+            user_content += "\n\nGENERAR TABLA COMPARATIVA MARKDOWN."
+
         response = await self.client.chat.completions.create(
-            model="gpt-4o",
+            model=settings.LLM_MODEL,
             messages=[
                 {"role": "system", "content": system_prompt},
-                {"role": "user", "content": f"Contexto:\n{context}\n\nPregunta: {query}"}
+                {"role": "user", "content": user_content}
             ]
         )
         

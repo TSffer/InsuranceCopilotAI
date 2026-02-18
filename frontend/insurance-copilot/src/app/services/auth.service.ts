@@ -85,6 +85,9 @@ export class AuthService {
 
   private setSession(authResult: AuthResponse) {
     localStorage.setItem('auth_token', authResult.token);
+    if (authResult.refresh_token) {
+      localStorage.setItem('auth_refresh_token', authResult.refresh_token);
+    }
     // Persist user info if available
     localStorage.setItem('auth_user', JSON.stringify(authResult.user));
 
@@ -94,6 +97,7 @@ export class AuthService {
 
   logout(): void {
     localStorage.removeItem('auth_token');
+    localStorage.removeItem('auth_refresh_token');
     localStorage.removeItem('auth_user');
     this.tokenSubject.next(null);
     this.currentUserSubject.next(null);
@@ -110,5 +114,41 @@ export class AuthService {
 
   getToken(): string | null {
     return this.tokenSubject.value;
+  }
+
+  getRefreshToken(): string | null {
+    return localStorage.getItem('auth_refresh_token');
+  }
+
+  refreshToken(): Observable<AuthResponse> {
+    const refreshToken = this.getRefreshToken();
+    if (!refreshToken) {
+      this.logout();
+      return of(null as any);
+    }
+
+    return this.http.post<any>(`${this.apiUrl}/refresh`, { refresh_token: refreshToken }).pipe(
+      map(response => {
+        // response matches Token schema from backend: { access_token, refresh_token, token_type }
+        // We need to map it to AuthResponse format expected by setSession or just update token
+        // But setSession expects AuthResponse which includes User. 
+        // The refresh endpoint only returns Token. 
+        // So we need to reconstruct AuthResponse reusing current user.
+
+        const currentUser = this.getCurrentUser();
+        const authResponse: AuthResponse = {
+          token: response.access_token,
+          refresh_token: response.refresh_token, // Update refresh token if rotated
+          user: currentUser!,
+          expiresIn: 1800 // default
+        };
+        return authResponse;
+      }),
+      tap(response => this.setSession(response)),
+      catchError(err => {
+        this.logout();
+        throw err;
+      })
+    );
   }
 }
