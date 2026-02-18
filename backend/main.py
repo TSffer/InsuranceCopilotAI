@@ -12,10 +12,10 @@ from src.api.endpoints import chat
 
 from sqlalchemy import text
 
-# Lifecycle event para inicializar DB (solo dev)
+# Lifecycle event to initialize DB (dev only)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Paso 1: Extension 'vector' removed (using Qdrant)
+    # Step 1: Extension 'vector' removed (using Qdrant)
     loop = asyncio.get_running_loop()
 
     # Initialize Checkpointer (AsyncPostgresSaver)
@@ -27,10 +27,10 @@ async def lifespan(app: FastAPI):
         # We might want to raise here if it's critical, or just log
         # raise e
 
-    # Paso 2: Crear tablas
-    # En producción usaríamos Alembic para migraciones.
+    # Step 2: Create tables
+    # In production we would use Alembic for migrations.
     async with engine.begin() as conn:
-        # await conn.run_sync(Base.metadata.drop_all) # Descomentar para resetear
+        # await conn.run_sync(Base.metadata.drop_all) # Uncomment to reset
         try:
             await conn.run_sync(Base.metadata.create_all)
         except Exception as e:

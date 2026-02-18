@@ -32,14 +32,14 @@ class UserResponse(UserBase):
 
 # --- Quote Schemas ---
 class QuoteRequest(BaseModel):
-    # Datos Cliente
+    # Client Data
     dni: Optional[str] = None
     email: Optional[str] = None
     first_name: Optional[str] = None
     last_name: Optional[str] = None
     phone: Optional[str] = None
     
-    # Datos Riesgo
+    # Risk Data
     age: int
     # car_brand, car_model, etc. flattened or nested. 
     # Frontend sends nested 'vehicle'. Let's support nested to match frontend types.ts more closely
@@ -112,7 +112,7 @@ class ChatResponse(BaseModel):
     answer: str
     thread_id: str
     sources: List[str] = []
-    data_table: Optional[Any] = None # Para tablas comparativas
+    data_table: Optional[Any] = None # For comparison tables
 
 # --- Policy Ingestion ---
 class PolicyCreate(BaseModel):

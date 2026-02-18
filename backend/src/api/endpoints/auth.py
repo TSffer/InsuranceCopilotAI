@@ -9,6 +9,9 @@ from ...core.config import settings
 import jwt
 from jwt.exceptions import InvalidTokenError
 from pydantic import BaseModel
+from ...domain.models import User
+from src.api.deps import get_current_user
+
 
 router = APIRouter()
 
@@ -23,7 +26,7 @@ async def register(user_create: UserCreate, db: AsyncSession = Depends(get_db)):
 @router.post("/token", response_model=Token)
 async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db: AsyncSession = Depends(get_db)):
     auth_service = AuthService(db)
-    # OAuth2PasswordRequestForm expects 'username' field, but we treat it as email
+
     return await auth_service.authenticate_user(form_data.username, form_data.password)
 
 @router.post("/refresh", response_model=Token)
@@ -42,10 +45,6 @@ async def refresh_access_token(refresh_req: RefreshRequest):
             raise credentials_exception
             
         access_token = create_access_token(subject=username)
-        # We can optionally rotate refresh token here too, but for now just return new access token
-        # Returning the SAME refresh token to keep it simple, or generate a new one if we want rotation.
-        # Let's just return the new access token and echo back the refresh token (or a new one).
-        # To match the Token schema, we need both.
         
         return Token(
             access_token=access_token, 
@@ -55,3 +54,8 @@ async def refresh_access_token(refresh_req: RefreshRequest):
         
     except InvalidTokenError:
         raise credentials_exception
+
+@router.get("/me", response_model=UserResponse)
+async def read_users_me(current_user: User = Depends(get_current_user)):
+    return current_user
+

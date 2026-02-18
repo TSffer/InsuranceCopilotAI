@@ -9,7 +9,6 @@ import { mockQuotes } from '@/app/shared/data/mock-data';
 })
 export class QuoteService {
   getQuotes(request: QuoteRequest): Observable<QuoteResponse> {
-    // Mock API call - in real app, call actual backend
     return of({
       quotes: mockQuotes,
       processingTime: 1200,

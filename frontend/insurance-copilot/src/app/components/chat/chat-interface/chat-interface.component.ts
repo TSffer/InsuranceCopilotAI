@@ -195,7 +195,7 @@ export class ChatInterfaceComponent implements OnInit, AfterViewChecked {
 
   currentSession$ = new Observable<ChatSession | null>();
   sessions$ = new Observable<ChatSession[]>();
-  currentSessionId$ = new Observable<string | null>(); // New observable
+  currentSessionId$ = new Observable<string | null>();
   currentSessionTitle = 'Nueva Sesión';
 
   private shouldScroll = false;
@@ -220,7 +220,6 @@ export class ChatInterfaceComponent implements OnInit, AfterViewChecked {
     this.currentSession$ = this.chatService.currentSession$;
     this.sessions$ = this.chatService.sessions$;
 
-    // Create the derived observable
     this.currentSessionId$ = this.currentSession$.pipe(
       map(session => session ? session.id : null)
     );
@@ -293,8 +292,5 @@ export class ChatInterfaceComponent implements OnInit, AfterViewChecked {
         this.messagesContainer.nativeElement.scrollHeight;
     } catch (err) { }
   }
-
-  // extractId helper is no longer needed in template but good to keep if needed logic later, 
-  // though for now we are using the observable pipe
 }
 

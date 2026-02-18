@@ -25,7 +25,5 @@ export class App implements OnInit {
     this.isLoggedIn$ = this.authService.currentUser$;
   }
 
-  ngOnInit(): void {
-    // Component initialization if needed
-  }
+  ngOnInit(): void { }
 }

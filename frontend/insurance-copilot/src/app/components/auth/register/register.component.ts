@@ -134,7 +134,6 @@ export class RegisterComponent {
     this.authService.register(registerData).subscribe({
       next: () => {
         this.loading = false;
-        // Optional: Auto login or redirect to login
         this.onSwitchToLogin.emit();
       },
       error: (err: any) => {

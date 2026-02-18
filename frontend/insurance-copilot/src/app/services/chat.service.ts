@@ -11,7 +11,7 @@ import {
   providedIn: 'root',
 })
 export class ChatService {
-  private apiUrl = 'http://localhost:8000/api/v1'; // Base API URL
+  private apiUrl = 'http://localhost:8000/api/v1';
 
   private currentSessionSubject = new BehaviorSubject<ChatSession | null>(null);
   public currentSession$ = this.currentSessionSubject.asObservable();
@@ -26,18 +26,16 @@ export class ChatService {
   loadSessions(): void {
     this.http.get<any[]>(`${this.apiUrl}/threads`).subscribe({
       next: (threads) => {
-        // Map backend threads to ChatSession
         const sessions: ChatSession[] = threads.map(t => ({
           id: t.id,
-          userId: 'current-user', // Backend handles user context
+          userId: 'current-user',
           title: t.title,
           createdAt: new Date(t.created_at),
           updatedAt: new Date(t.updated_at),
-          messages: [] // Messages loaded on demand
+          messages: []
         }));
         this.sessionsSubject.next(sessions);
 
-        // Load first session if none selected
         if (sessions.length > 0 && !this.currentSessionSubject.value) {
           this.loadSession(sessions[0].id);
         }
@@ -73,11 +71,6 @@ export class ChatService {
     const currentSession = this.currentSessionSubject.value;
     let threadId = currentSession?.id;
 
-    // If no session exists, create one first? 
-    // Ideally UI should handle this, but let's assume session exists or thread_id is null for new.
-    // However, our backend /chat endpoint takes thread_id.
-
-    // Optimistic UI update for User Message
     const userMsg = {
       id: 'temp-user-' + Date.now(),
       content: request.message,
@@ -86,7 +79,6 @@ export class ChatService {
       status: 'sending' as const,
     };
 
-    // Update local state immediately
     if (currentSession) {
       currentSession.messages = [...currentSession.messages, userMsg];
       this.currentSessionSubject.next({ ...currentSession });
@@ -99,20 +91,16 @@ export class ChatService {
 
     return this.http.post<any>(`${this.apiUrl}/chat`, payload).pipe(
       map(response => {
-        // Return formatted response
         return {
           id: 'msg-' + Date.now(),
           content: response.answer,
           timestamp: new Date(),
-          // Comparison/Table data parsing if needed
-          comparisonResult: undefined // TODO: Parse sources/data_table if backend sends it
+          comparisonResult: undefined
         } as ChatMessageResponse;
       }),
       tap((msg) => {
-        // Update Session with Assistant Message
         const session = this.currentSessionSubject.value;
         if (session) {
-          // Update user msg status
           session.messages = session.messages.map(m => m.id === userMsg.id ? { ...m, status: 'sent' } : m);
 
           const assistantMsg = {
@@ -126,24 +114,17 @@ export class ChatService {
 
           session.messages.push(assistantMsg);
           this.currentSessionSubject.next({ ...session });
-
-          // Refresh threads list order logic if needed
         } else {
-          // Case where we started without a session (if supported)
-          // We should reload sessions to get the new one created by backend if we passed null thread_id
           this.loadSessions();
         }
       }),
       catchError((error) => {
         console.error('Chat API Error:', error);
 
-        // Update Session with Error State
         const session = this.currentSessionSubject.value;
         if (session) {
-          // 1. Mark user message as error
           session.messages = session.messages.map(m => m.id === userMsg.id ? { ...m, status: 'error' } : m);
 
-          // 2. Add System/Assistant Error Message
           const errorMsg = {
             id: 'err-' + Date.now(),
             content: "❌ Lo siento, ocurrió un error en el servidor. Por favor intenta más tarde o reformula tu pregunta.",
@@ -156,15 +137,12 @@ export class ChatService {
           this.currentSessionSubject.next({ ...session });
         }
 
-        // Propagate error to component to stop isLoading
         return throwError(() => error);
       })
     );
   }
 
   loadSession(sessionId: string): void {
-    // Check if we have messages loaded? 
-    // Always fetch latest messages
     this.http.get<any[]>(`${this.apiUrl}/threads/${sessionId}/messages`).subscribe({
       next: (msgs) => {
         const session = this.sessionsSubject.value.find(s => s.id === sessionId);

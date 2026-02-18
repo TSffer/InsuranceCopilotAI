@@ -33,13 +33,6 @@ import { MarkdownModule } from 'ngx-markdown';
             class="markdown-body block"
           ></markdown>
         </div>
-
-        <!-- Keeping existing Table content logic for Quotes/Specific structured data if needed, 
-             but now the MAIN content is markdown which handles comparisons perfectly. 
-             If message.metadata.type is 'table', we might prevent duplication if backend sends BOTH text and table data.
-             But current backend workflow sends response as TEXT (Markdown Table). 
-             So we just render content. 
-        -->
         
         <div *ngIf="message.role === 'assistant'" class="absolute -bottom-5 left-2 opacity-0 group-hover:opacity-100 transition-opacity text-[10px] text-muted-foreground">
            InsuroBot

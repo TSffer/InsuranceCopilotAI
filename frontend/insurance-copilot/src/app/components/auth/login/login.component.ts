@@ -116,7 +116,7 @@ export class LoginComponent {
       .subscribe({
         next: () => {
           this.loading = false;
-          this.router.navigate(['/chat']); // Adjust route as needed
+          this.router.navigate(['/chat']);
         },
         error: (err: any) => {
           console.error('Login error:', err);
