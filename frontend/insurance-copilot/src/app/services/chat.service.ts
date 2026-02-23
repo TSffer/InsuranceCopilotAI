@@ -1,17 +1,18 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { BehaviorSubject, Observable, tap, map, of, switchMap, catchError, throwError } from 'rxjs';
+import { BehaviorSubject, Observable, tap, map, catchError, throwError } from 'rxjs';
 import {
   ChatSession,
   ChatMessageRequest,
   ChatMessageResponse,
 } from '@/app/shared/models/types';
+import { environment } from '@/environments/environment';
 
 @Injectable({
   providedIn: 'root',
 })
 export class ChatService {
-  private apiUrl = 'http://localhost:8000/api/v1';
+  private apiUrl = environment.apiUrl;
 
   private currentSessionSubject = new BehaviorSubject<ChatSession | null>(null);
   public currentSession$ = this.currentSessionSubject.asObservable();

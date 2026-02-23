@@ -10,6 +10,7 @@ import { environment } from '@/environments/environment';
 })
 export class AuthService {
   private apiUrl = environment.apiUrl + '/auth';
+
   private currentUserSubject = new BehaviorSubject<User | null>(null);
   public currentUser$ = this.currentUserSubject.asObservable();
 
@@ -49,17 +50,13 @@ export class AuthService {
       map(response => {
         const authResponse: AuthResponse = {
           token: response.access_token,
-          user: {
-            id: '0',
-            email: credentials.email,
-            firstName: 'User',
-            lastName: '',
-            role: 'broker',
-            createdAt: new Date()
-          },
+          user: {} as User,
           expiresIn: 1800
         };
         return authResponse;
+      }),
+      tap((response) => {
+        this.setSession(response);
       }),
       switchMap(authResponse => {
         return this.getMe().pipe(
@@ -69,9 +66,6 @@ export class AuthService {
           }),
           catchError(() => of(authResponse))
         );
-      }),
-      tap((response) => {
-        this.setSession(response);
       })
     );
   }
