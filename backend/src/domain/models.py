@@ -55,10 +55,7 @@ class Policy(Base):
     base_price = Column(Float) 
     
     # Contenido para RAG
-    # Contenido para RAG
-    content_text = Column(Text)
-    # embedding column removed (now using Qdrant)
-    
+    content_text = Column(Text)    
     metadata_json = Column(JSON)
 
 class Rate(Base):

@@ -1,8 +1,10 @@
-from typing import List, Any
+from typing import List, Any, Tuple
 import uuid
+import json
 from sqlalchemy.ext.asyncio import AsyncSession
 from langchain_core.tools import tool
 from langchain_openai import ChatOpenAI
+from langchain_core.messages import ToolMessage 
 
 from psycopg_pool import AsyncConnectionPool
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
@@ -47,7 +49,7 @@ class AgentService:
         self.db = db
         self.llm = ChatOpenAI(
             model=settings.LLM_MODEL, 
-            temperature=0, 
+            temperature=settings.LLM_TEMPERATURE, 
             api_key=settings.OPENAI_API_KEY
         )
         
@@ -74,8 +76,18 @@ class AgentService:
             """
             Útil SOLO cuando el usuario quiere saber el PRECIO, costo o cotización de un seguro.
             Calcula la prima exacta para un auto específico.
-            Requiere: edad conductor, MARCA y MODELO del auto (ej: Toyota Corolla), año fabricación.
-            OPCIONAL: DNI y Nombre para guardar el posible cliente.
+            
+            REQUIERE OBLIGATORIAMENTE:
+            - age (edad del conductor)
+            - car_brand (Marca: Toyota, Nissan, Kia, etc.)
+            - car_model (Modelo: Corolla, Yaris, Rio, etc.)
+            - car_year (Año de fabricación: 2020, 2023, etc.)
+            
+            OPCIONALES:
+            - usage (Uso: 'Particular', 'Taxi', 'Carga', 'Comercial'). Si no se especifica, asumir 'Particular'.
+            - dni y first_name (Datos del cliente).
+            
+            SI FALTAN DATOS (especialmente Marca, Modelo o Año), NO INVENTES. PREGUNTA al usuario por el dato que falta.
             """
             try:
                 # Convertir argumentos a esquema Pydantic para el servicio
@@ -101,17 +113,22 @@ class AgentService:
             Ejemplo: '¿Cubre robo de espejos?', '¿Qué pasa si manejo ebrio?'.
             Busca en la documentación legal y pólizas.
             """
-            return await self.rag_service.answer_legal_query(query)
+            result = await self.rag_service.answer_legal_query(query)
+            # Retornamos JSON con respuesta y sources para procesarlo después
+            return json.dumps(result, ensure_ascii=False)
 
         @tool
         async def compare_insurance_policies(query: str) -> str:
             """
             Útil cuando el usuario pide COMPARAR dos o más planes/aseguradoras.
-            Ejemplo: 'Diferencia entre Rimac y Pacífico', 'Comparar deducibles'.
+            También si pide 'coberturas de X, Y y Z'.
+            Ejemplo: 'Diferencia entre Rimac y Pacífico', 'Comparar deducibles', 'Coberturas de Rimac y Mapfre'.
             Genera una TABLA COMPARATIVA basándose en la documentación legal.
             """
             # Forzamos el formato de tabla en el servicio RAG
-            return await self.rag_service.answer_legal_query(query, force_table=True)
+            result = await self.rag_service.answer_legal_query(query, force_table=True)
+            # Retornamos JSON con respuesta y sources para procesarlo después
+            return json.dumps(result, ensure_ascii=False)
 
         tools = [calculate_insurance_quote, search_legal_conditions, compare_insurance_policies]
         
@@ -171,16 +188,38 @@ class AgentService:
         
         # Extraemos el último mensaje del asistente
         assistant_response = result["messages"][-1].content
-
+        
+        # Extraer sources de los ToolMessages si existen (parseando JSON)
+        unique_sources = {}
+        for msg in result["messages"]:
+            if isinstance(msg, ToolMessage):
+                # Intentar parsear el contenido como JSON
+                try:
+                    data = json.loads(msg.content)
+                    if isinstance(data, dict) and "sources" in data:
+                        for s in data["sources"]:
+                             if isinstance(s, dict) and "title" in s:
+                                unique_sources[s["title"]] = s
+                except:
+                    # Si no es JSON, o falla, ignorar (puede ser calculate_quote que devuelve string plano)
+                    pass
+                            
         # 4. Guardar Interacción
-        await self._save_interaction(thread_id, user_query, assistant_response)
+        sources_list = list(unique_sources.values()) if unique_sources else []
+        await self._save_interaction(thread_id, user_query, assistant_response, sources_list)
 
         return {
             "answer": assistant_response,
-            "thread_id": thread_id
+            "thread_id": thread_id,
+            "sources": list(unique_sources.values()) if unique_sources else []
         }
 
-    async def _save_interaction(self, thread_id: str, user_msg: str, assistant_msg: str):
+    async def _save_interaction(self, thread_id: str, user_msg: str, assistant_msg: str, sources: List[dict] = None):
         """Método auxiliar para guardar el historial de chat en la base de datos."""
         await self.chat_service.save_message(thread_id, "user", user_msg)
-        await self.chat_service.save_message(thread_id, "assistant", assistant_msg)
+        
+        metadata = None
+        if sources:
+            metadata = {"sources": sources}
+            
+        await self.chat_service.save_message(thread_id, "assistant", assistant_msg, metadata=metadata)

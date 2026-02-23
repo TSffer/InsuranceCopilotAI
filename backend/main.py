@@ -5,20 +5,22 @@ if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from src.core.config import settings
 from src.core.database import engine, Base
 from src.api.endpoints import chat
+from src.api.endpoints import files
+from src.api.endpoints import chat, auth, ingest, quote
 
 from sqlalchemy import text
 
-# Lifecycle event to initialize DB (dev only)
+# Evento de vida para inicializar DB (dev only)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Step 1: Extension 'vector' removed (using Qdrant)
     loop = asyncio.get_running_loop()
 
-    # Initialize Checkpointer (AsyncPostgresSaver)
+    # Inicializar Checkpointer (AsyncPostgresSaver)
     from src.services.agent_service import initialize_checkpointer
     try:
         await initialize_checkpointer()
@@ -27,10 +29,10 @@ async def lifespan(app: FastAPI):
         # We might want to raise here if it's critical, or just log
         # raise e
 
-    # Step 2: Create tables
-    # In production we would use Alembic for migrations.
+    # Crear tablas
+    # En producción usamos Alembic para migraciones.
     async with engine.begin() as conn:
-        # await conn.run_sync(Base.metadata.drop_all) # Uncomment to reset
+        # await conn.run_sync(Base.metadata.drop_all) # Descomentar para resetear
         try:
             await conn.run_sync(Base.metadata.create_all)
         except Exception as e:
@@ -44,16 +46,13 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-from src.api.endpoints import chat, auth, ingest, quote
-
-from fastapi.middleware.cors import CORSMiddleware
-
 # Routers
 app.include_router(auth.router, prefix="/api/v1", tags=["auth"])
 app.include_router(chat.router, prefix=settings.API_V1_STR, tags=["chat"])
 app.include_router(ingest.router, prefix=f"{settings.API_V1_STR}/ingest", tags=["ingestion"])
 app.include_router(quote.router, prefix=f"{settings.API_V1_STR}/quotes", tags=["quotes"])
 app.include_router(auth.router, prefix=f"{settings.API_V1_STR}/auth", tags=["auth"])
+app.include_router(files.router, prefix=f"{settings.API_V1_STR}/files", tags=["files"])
 
 # CORS Configuration
 origins = [

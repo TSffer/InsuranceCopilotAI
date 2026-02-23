@@ -3,7 +3,6 @@ import sys
 import asyncio
 if __name__ == "__main__":
     if sys.platform == "win32":
-        # Fix for Psycopg ProactorEventLoop issue on Windows
         asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
     import uvicorn
@@ -13,5 +12,4 @@ if __name__ == "__main__":
         server = uvicorn.Server(config)
         await server.serve()
 
-    # Run the application using asyncio.run which respects the set policy
     asyncio.run(main())

@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import List, Optional, Any
+from typing import List, Optional, Any, Dict
 
 # --- Shared ---
 class Token(BaseModel):
@@ -85,9 +85,13 @@ class MessageBase(BaseModel):
 class MessageCreate(MessageBase):
     pass
 
-class MessageResponse(MessageBase):
+class MessageResponse(BaseModel):
     id: str
+    role: str
+    content: str
     created_at: datetime
+    metadata_json: Optional[Dict[str, Any]] = None
+
     class Config:
         from_attributes = True
 
@@ -108,11 +112,17 @@ class ThreadResponse(ThreadBase):
     class Config:
         from_attributes = True
 
+class Source(BaseModel):
+    id: Optional[str] = None
+    title: str
+    content: str
+    score: Optional[float] = None
+
 class ChatResponse(BaseModel):
     answer: str
     thread_id: str
-    sources: List[str] = []
-    data_table: Optional[Any] = None # For comparison tables
+    sources: List[Source] = []
+    data_table: Optional[Any] = None
 
 # --- Policy Ingestion ---
 class PolicyCreate(BaseModel):

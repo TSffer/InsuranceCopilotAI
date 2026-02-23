@@ -23,7 +23,7 @@ async def chat_endpoint(request: ChatRequest, db: AsyncSession = Depends(get_db)
         return ChatResponse(
             answer=str(result["answer"]),
             thread_id=result["thread_id"],
-            sources=["Agent Generated"]
+            sources=result.get("sources", [])
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

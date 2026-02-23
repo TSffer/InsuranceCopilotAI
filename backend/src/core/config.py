@@ -28,6 +28,7 @@ class Settings(BaseSettings):
     # AI
     OPENAI_API_KEY: str
     LLM_MODEL: str = "gpt-4o-mini"
+    LLM_TEMPERATURE: float = 0.0
 
     # Security
     SECRET_KEY: str = "your-super-secret-key-change-it"

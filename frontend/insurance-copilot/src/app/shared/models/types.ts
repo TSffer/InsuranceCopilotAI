@@ -39,6 +39,7 @@ export interface Message {
     type?: 'text' | 'table' | 'quote' | 'analysis';
     data?: unknown;
   };
+  sources?: { title: string; content: string; score?: number }[];
 }
 
 export interface ChatSession {
@@ -62,6 +63,7 @@ export interface ChatMessageResponse {
   timestamp: Date;
   analysisResult?: QueryAnalysis;
   comparisonResult?: ComparisonResult;
+  sources?: { title: string; content: string; score?: number }[];
 }
 
 // ============ ANÁLISIS DE QUERY ============

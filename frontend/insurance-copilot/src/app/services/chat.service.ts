@@ -95,7 +95,8 @@ export class ChatService {
           id: 'msg-' + Date.now(),
           content: response.answer,
           timestamp: new Date(),
-          comparisonResult: undefined
+          comparisonResult: undefined,
+          sources: response.sources
         } as ChatMessageResponse;
       }),
       tap((msg) => {
@@ -109,7 +110,7 @@ export class ChatService {
             role: 'assistant' as const,
             timestamp: msg.timestamp,
             status: 'sent' as const,
-            // metadata...
+            sources: msg.sources
           };
 
           session.messages.push(assistantMsg);
@@ -152,7 +153,8 @@ export class ChatService {
             content: m.content,
             role: m.role as 'user' | 'assistant',
             timestamp: new Date(m.created_at),
-            status: 'sent'
+            status: 'sent',
+            sources: m.metadata_json?.sources || []
           }));
           this.currentSessionSubject.next({ ...session });
         }
@@ -199,5 +201,11 @@ export class ChatService {
         }
       })
     );
+  }
+
+  downloadSlip(title: string, content: string, tableData: any = null): Observable<Blob> {
+    const url = `${this.apiUrl}/files/pdf/slip`;
+    const body = { title, content, table_data: tableData };
+    return this.http.post(url, body, { responseType: 'blob' });
   }
 }
