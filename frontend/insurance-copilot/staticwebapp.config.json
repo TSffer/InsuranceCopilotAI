@@ -11,7 +11,7 @@
     }
   ],
   "globalHeaders": {
-    "content-security-policy": "default-src 'self' https: data: 'unsafe-inline' 'unsafe-eval'; connect-src 'self' https:; img-src 'self' https: data:; style-src 'self' 'unsafe-inline' https: fonts.googleapis.com; font-src 'self' https: fonts.gstatic.com; frame-ancestors 'none'; object-src 'none';"
+    "content-security-policy": "default-src * 'unsafe-inline' 'unsafe-eval' data: blob:; connect-src *; img-src * data: blob:; style-src * 'unsafe-inline'; font-src * data:;"
   },
   "mimeTypes": {
     ".json": "text/json"
