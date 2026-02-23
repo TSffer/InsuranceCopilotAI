@@ -1,25 +1,27 @@
+# Usamos una imagen ligera de Python
 FROM python:3.12-slim
+
+# Instalamos uv para una gestión de dependencias ultra rápida
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
 WORKDIR /app
 
-# Install system dependencies
+# Instalamos dependencias del sistema necesarias para psycopg y otras librerías
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy project definition and install dependencies
-COPY pyproject.toml .
-# We use pip to install the project and its dependencies. 
-# This assumes the project structure is standard.
-RUN pip install --no-cache-dir .
+# Copiamos archivos de dependencias e instalamos
+COPY pyproject.toml uv.lock ./
+RUN uv sync --frozen --no-cache --no-dev
 
-# Copy the rest of the application
+# Copiamos el resto del código
 COPY . .
 
-# Expose port
+# Exponemos el puerto 8000 (ajustar en Azure Container App Ingress)
 EXPOSE 8000
 
-# Run the application
-# Assumes main.py is in the root of the context (which is backend/)
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Comando de arranque usando run.py como pidió el usuario
+# Aseguramos que run.py use 0.0.0.0 internamente
+CMD ["uv", "run", "python", "run.py"]

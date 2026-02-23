@@ -65,14 +65,3 @@ async def get_messages(thread_id: str, db: AsyncSession = Depends(get_db), curre
     chat_service = ChatService(db)
     return await chat_service.get_thread_messages(thread_id)
 
-@router.post("/quote", response_model=list[QuoteResponse])
-async def quote_endpoint(request: QuoteRequest, db: AsyncSession = Depends(get_db)):
-    """
-    Endpoint directo para cotizar.
-    """
-    quote_service = QuoteService(db)
-    try:
-        quotes = await quote_service.get_quotes(request)
-        return quotes
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))

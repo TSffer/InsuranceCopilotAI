@@ -1,6 +1,5 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from sqlalchemy import select
 from ..domain.models import Policy, Rate, Quote, Customer
 from ..domain.schemas import QuoteRequest, QuoteResponse
 
@@ -45,6 +44,10 @@ class QuoteService:
             car_model = request.vehicle.get('model', car_model)
             car_year = request.vehicle.get('year', car_year)
             
+        # Clean inputs
+        car_brand = car_brand.strip() if car_brand else ""
+        car_model = car_model.strip() if car_model else ""
+        
         stmt = select(Rate).where(
             (Rate.brand.ilike(car_brand)) &
             (Rate.model.ilike(car_model)) &
@@ -77,7 +80,7 @@ class QuoteService:
                 car_brand=car_brand,
                 car_model=self.normalize_text(car_model),
                 car_year=car_year,
-                usage=request.usage,
+                car_usage=request.usage,
                 selected_insurer=rate.insurer,
                 selected_plan=rate.plan_name,
                 final_price=round(final_price, 2),

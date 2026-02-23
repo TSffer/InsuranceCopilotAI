@@ -134,7 +134,7 @@ class RAGService:
             
         return reranked_docs
 
-    async def answer_legal_query(self, query: str, force_table: bool = False) -> str:
+    async def answer_legal_query(self, query: str, force_table: bool = False) -> dict:
         # Pipeline execution
         queries = await self.expand_query(query)
         docs = await self.retrieve_documents(queries)
@@ -144,12 +144,30 @@ class RAGService:
             docs = docs[:5] 
             
         if not docs:
-            return "No encontré información relevante en las pólizas cargadas."
+            return {"answer": "No encontré información relevante en las pólizas cargadas.", "sources": []}
 
         context = "\n\n".join([
             f"--- Doc: {d.get('metadata', {}).get('source_file')} ---\n{d['content']}" 
             for d in docs
         ])
+        
+        # Extract rich sources
+        # We want to return a list of unique sources with their content for hover preview
+        # If multiple chunks come from the same file, we can either concatenate or just take the top one.
+        # Let's take the top chunk for preview or the most relevant one.
+        
+        unique_sources_map = {}
+        for d in docs:
+            fname = d.get('metadata', {}).get('source_file', 'Unknown')
+            if fname not in unique_sources_map:
+                unique_sources_map[fname] = {
+                    "title": fname,
+                    "content": d['content'], # Simplified: taking the first chunk's content as preview
+                    "id": str(d.get("id", "")),
+                    "score": float(d.get("score")) if d.get("score") is not None else None
+                }
+        
+        rich_sources = list(unique_sources_map.values())
 
         system_prompt = """Eres un experto en seguros. Responde usando SOLO el contexto proporcionado.
         - Resalta montos, porcentajes y monedas (USD, Soles).
@@ -158,27 +176,27 @@ class RAGService:
 
         if force_table:
             system_prompt += """
-            - LA RESPUESTA DEBE SER EXCLUSIVAMENTE UNA TABLA MARKDOWN.
-            - NO uses listas con viñetas.
+            - LA RESPUESTA DEBE SER EXCLUSIVAMENTE UNA TABLA MARKDOWN DETALLADA.
+            - Columnas sugeridas: 'Aseguradora/Plan', 'Cobertura Principal', 'Deducible', 'Exclusiones', 'Beneficios Extra'.
+            - NO uses listas con viñetas fuera de la tabla.
             - NO uses párrafos introductorios ni conclusivos.
             - Formato MARKDOWN puro.
-            
-            EJEMPLO:
-            | Característica | Rimac | Pacifico |
-            |---|---|---|
-            | Deducible | $150 | $200 |
             """
         
         user_content = f"Contexto:\n{context}\n\nPregunta: {query}"
         if force_table:
-            user_content += "\n\nGENERAR TABLA COMPARATIVA MARKDOWN."
+            user_content += "\n\nGENERAR TABLA COMPARATIVA MARKDOWN DETALLADA."
 
         response = await self.client.chat.completions.create(
             model=settings.LLM_MODEL,
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_content}
-            ]
+            ],
+            temperature=settings.LLM_TEMPERATURE
         )
         
-        return response.choices[0].message.content
+        return {
+            "answer": response.choices[0].message.content,
+            "sources": rich_sources
+        }

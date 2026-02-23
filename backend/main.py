@@ -11,7 +11,7 @@ from src.core.config import settings
 from src.core.database import engine, Base
 from src.api.endpoints import chat
 from src.api.endpoints import files
-from src.api.endpoints import chat, auth, ingest, quote
+from src.api.endpoints import chat, auth, ingest
 
 from sqlalchemy import text
 
@@ -47,19 +47,15 @@ app = FastAPI(
 )
 
 # Routers
-app.include_router(auth.router, prefix="/api/v1", tags=["auth"])
 app.include_router(chat.router, prefix=settings.API_V1_STR, tags=["chat"])
 app.include_router(ingest.router, prefix=f"{settings.API_V1_STR}/ingest", tags=["ingestion"])
-app.include_router(quote.router, prefix=f"{settings.API_V1_STR}/quotes", tags=["quotes"])
 app.include_router(auth.router, prefix=f"{settings.API_V1_STR}/auth", tags=["auth"])
 app.include_router(files.router, prefix=f"{settings.API_V1_STR}/files", tags=["files"])
 
 # CORS Configuration
-origins = [
-    "http://localhost:4200",
-    "http://localhost",
-    "http://127.0.0.1:4200",
-]
+# Para producción en Azure, permitimos todos los orígenes temporalmente
+# o puedes añadir la URL de tu Static Web App aquí.
+origins = ["*"]
 
 app.add_middleware(
     CORSMiddleware,

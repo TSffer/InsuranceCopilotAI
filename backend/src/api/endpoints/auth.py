@@ -1,14 +1,17 @@
+import jwt
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi.security import OAuth2PasswordRequestForm
+
+from jwt.exceptions import InvalidTokenError
+from pydantic import BaseModel
+
 from ...core.database import get_db
 from ...domain.schemas import UserCreate, UserResponse, Token
 from ...services.auth_service import AuthService
 from ...core.security import create_access_token
 from ...core.config import settings
-import jwt
-from jwt.exceptions import InvalidTokenError
-from pydantic import BaseModel
 from ...domain.models import User
 from src.api.deps import get_current_user
 

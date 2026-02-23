@@ -1,4 +1,4 @@
 export const environment = {
   production: true,
-  apiUrl: 'https://ca-backend.livelyglacier-ed8fba0b.eastus2.azurecontainerapps.io/api/v1',
+  apiUrl: 'https://ca-backend.blacktree-0b28f0bf.eastus2.azurecontainerapps.io/api/v1',
 };
