@@ -81,7 +81,7 @@ import { AuthRequest } from '@/app/shared/models/types';
         Crear Nueva Cuenta
       </button>
 
-      <div class="mt-6 p-4 rounded-lg bg-muted/30 border border-border">
+      <!--div class="mt-6 p-4 rounded-lg bg-muted/30 border border-border">
         <p class="text-xs text-muted-foreground mb-2 font-semibold">
           Demo - Credenciales de prueba:
         </p>
@@ -90,15 +90,15 @@ import { AuthRequest } from '@/app/shared/models/types';
           <br />
           <span class="font-mono">password123</span>
         </p>
-      </div>
+      </div-->
     </div>
   `,
 })
 export class LoginComponent {
   @Output() onSwitchToRegister = new EventEmitter<void>();
 
-  email = 'broker@seguros.com';
-  password = 'password123';
+  email = 'prueba@gmail.com';
+  password = '';
   loading = false;
   error: string | null = null;
 

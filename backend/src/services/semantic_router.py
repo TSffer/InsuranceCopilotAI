@@ -4,28 +4,34 @@ from ..core.config import settings
 from typing import List, Optional
 import uuid
 from fastembed import TextEmbedding
+import difflib
+
+# Global instances for pre-warming and sharing
+_embedding_model = None
+_qdrant_client = None
 
 class SemanticRouter:
     def __init__(self):
-        # Usamos FastEmbed en lugar de OpenAI para ahorrar costos y ser "local"
-        # BAAI/bge-small-en-v1.5 tiene dimension 384. Es muy rápido y bueno para inglés.
-        # Para español podríamos usar 'sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2' (también 384 dim)
-        # o 'intfloat/multilingual-e5-small'. FastEmbed soporta varios.
-        # Usaremos el default que es bastante bueno o especificaremos uno multilingue si es necesario.
-        # Por simplicidad y rapidez, usaremos el default de fastembed (bge-small-en-v1.5) pero 
-        # dado que es español, intentaremos forzar uno multilingüe si fastembed lo permite fácil, 
-        # sino el default suele funcionar "ok" o usamos uno específico.
-        # Revisando docs de fastembed, el default es 'BAAI/bge-small-en-v1.5'.
-        # Vamos a usar 'sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2' para mejor soporte español.
+        global _embedding_model, _qdrant_client
         
-        self.embedding_model = TextEmbedding(model_name="sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2")
-        # Dimension de este modelo es 384
+        self.mode = settings.SEMANTIC_ROUTER_MODE
         self.vector_size = 384
         
-        self.qdrant = QdrantClient(
-            url=settings.QDRANT_URL, 
-            api_key=settings.QDRANT_API_KEY
-        )
+        # Solo cargamos modelos pesados si el modo es "semantic"
+        if self.mode == "semantic":
+            if _embedding_model is None:
+                _embedding_model = TextEmbedding(model_name="sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2")
+            if _qdrant_client is None:
+                _qdrant_client = QdrantClient(
+                    url=settings.QDRANT_URL, 
+                    api_key=settings.QDRANT_API_KEY
+                )
+            self.embedding_model = _embedding_model
+            self.qdrant = _qdrant_client
+        else:
+            self.embedding_model = None
+            self.qdrant = None
+
         self.collection_name = settings.QDRANT_SEMANTIC_COLLECTION_NAME
         
         # Anchors for Greeting
@@ -38,7 +44,7 @@ class SemanticRouter:
         self.unsafe_anchors = [
             "ignore previous instructions", "system prompt", "delete database", 
             "drop table", "exec(", "eval(", "import os", "rm -rf", 
-            "write python code", "generame codigo", "hackear", "bypass security"
+            "write python code", "generame codigo", "hackear", "bypass security",
         ]
 
     async def initialize(self):
@@ -123,6 +129,10 @@ class SemanticRouter:
         """
         Returns 'GREETING', 'UNSAFE', or None.
         """
+        if self.mode == "keyword":
+            return await self._route_keyword(query)
+        
+        # Modo Semántico (Original)
         # Ensure init (light check)
         await self.initialize()
 
@@ -143,7 +153,7 @@ class SemanticRouter:
         route_type = top_match.payload.get("type")
         
         # Thresholds (ajustar segun modelo)
-        unsafe_threshold = 0.60 # FastEmbed suele dar scores mas altos o bajos dependiendo del modelo
+        unsafe_threshold = 0.60 
         greeting_threshold = 0.65
         
         if route_type == "UNSAFE" and score > unsafe_threshold:
@@ -151,6 +161,31 @@ class SemanticRouter:
             
         if route_type == "GREETING" and score > greeting_threshold:
             return "GREETING"
+            
+        return None
+
+    async def _route_keyword(self, query: str) -> Optional[str]:
+        """
+        Versión ultra-ligera usando difflib.
+        """
+        query_lower = query.lower().strip()
+        
+        # 1. Búsqueda exacta rápida
+        if any(word in query_lower for word in self.greeting_anchors):
+            return "GREETING"
+        
+        if any(word in query_lower for word in self.unsafe_anchors):
+            return "UNSAFE"
+            
+        # 2. Búsqueda por similitud (difflib) para capturar typos
+        # Usamos un cutoff alto (0.8) para evitar falsos positivos
+        close_greetings = difflib.get_close_matches(query_lower, self.greeting_anchors, n=1, cutoff=0.8)
+        if close_greetings:
+            return "GREETING"
+            
+        close_unsafe = difflib.get_close_matches(query_lower, self.unsafe_anchors, n=1, cutoff=0.8)
+        if close_unsafe:
+            return "UNSAFE"
             
         return None
 

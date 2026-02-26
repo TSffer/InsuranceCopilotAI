@@ -9,8 +9,8 @@ import { ChatService } from '@/app/services/chat.service';
   standalone: true,
   imports: [CommonModule, MarkdownModule],
   template: `
-    <div class="flex gap-4 animate-fadeIn group" [ngClass]="message.role === 'user' ? 'justify-end' : 'justify-start'">
-      <!-- Assistant Avatar -->
+    <div class="relative flex gap-4 animate-fadeIn group" [ngClass]="message.role === 'user' ? 'justify-end' : 'justify-start'">
+      <!-- Avatar Asistente -->
       <div
         *ngIf="message.role === 'assistant'"
         class="flex-shrink-0 w-8 h-8 rounded-lg bg-gradient-to-br from-white to-white/50 border border-white/20 shadow-sm flex items-center justify-center mt-auto"
@@ -18,13 +18,13 @@ import { ChatService } from '@/app/services/chat.service';
         <span class="text-sm select-none">🤖</span>
       </div>
 
-      <!-- Message bubble -->
+      <!-- Burbuja de Mensaje -->
       <div
-        class="flex-1 max-w-[85%] md:max-w-md lg:max-w-2xl shadow-sm relative group"
+        class="flex-1 max-w-[90%] shadow-sm relative group"
         [ngClass]="
           message.role === 'user'
-            ? 'bg-primary text-primary-foreground rounded-2xl rounded-tr-sm ml-auto'
-            : 'bg-white/80 dark:bg-card/80 backdrop-blur-sm border border-border/50 text-foreground rounded-2xl rounded-tl-sm shadow-sm'
+            ? 'md:max-w-md lg:max-w-xl bg-primary text-primary-foreground rounded-2xl rounded-tr-sm ml-auto'
+            : 'md:max-w-3xl lg:max-w-5xl bg-white/80 dark:bg-card/80 backdrop-blur-sm border border-border/50 text-foreground rounded-2xl rounded-tl-sm shadow-sm'
         "
       >
         <div class="px-5 py-3.5">
@@ -76,7 +76,7 @@ import { ChatService } from '@/app/services/chat.service';
         </div>
       </div>
 
-      <!-- User Avatar -->
+      <!-- Avatar Usuario -->
       <div
         *ngIf="message.role === 'user'"
         class="flex-shrink-0 w-8 h-8 rounded-lg bg-primary shadow-lg shadow-primary/20 flex items-center justify-center mt-auto text-white"
@@ -84,7 +84,7 @@ import { ChatService } from '@/app/services/chat.service';
         <span class="text-sm font-semibold select-none">Tú</span>
       </div>
 
-      <!-- Actions (Assistant Only) -->
+      <!-- Acciones (Solo Asistente) -->
       <div *ngIf="message.role === 'assistant'" class="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
         <button 
           (click)="downloadPdf()" 

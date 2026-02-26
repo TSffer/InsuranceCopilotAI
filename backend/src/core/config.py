@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     QDRANT_API_KEY: Optional[str] = None
     QDRANT_COLLECTION_NAME: str = "policies"
     QDRANT_SEMANTIC_COLLECTION_NAME: str = "semantic_guardrails"
+    SEMANTIC_ROUTER_MODE: str = "keyword" # "semantic" o "keyword"
 
     # RAG
     ENABLE_QUERY_EXPANSION: bool = True

@@ -6,25 +6,37 @@ from fastembed import SparseTextEmbedding
 from ..core.config import settings
 import asyncio
 
+
+# Global instances to avoid reloading models on every request
+_qdrant_client = None
+_ranker = None
+_sparse_model = None
+
 class RAGService:
     def __init__(self):
+        global _qdrant_client, _ranker, _sparse_model
+        
         # Initialize Qdrant
-        self.qdrant = QdrantClient(
-            url=settings.QDRANT_URL,
-            api_key=settings.QDRANT_API_KEY
-        )
+        if _qdrant_client is None:
+            _qdrant_client = QdrantClient(
+                url=settings.QDRANT_URL,
+                api_key=settings.QDRANT_API_KEY
+            )
+        self.qdrant = _qdrant_client
         self.collection_name = settings.QDRANT_COLLECTION_NAME
         
         # Initialize LLM
         self.client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
         
-        # Initialize Reranker
-        if settings.ENABLE_RERANKING:
-            self.ranker = Ranker(model_name=settings.RERANK_MODEL, cache_dir="/tmp/flashrank")
+        # Initialize Reranker (Once)
+        if settings.ENABLE_RERANKING and _ranker is None:
+            _ranker = Ranker(model_name=settings.RERANK_MODEL, cache_dir="/tmp/flashrank")
+        self.ranker = _ranker
             
-        # Initialize Sparse Model for Query Encoding
-        if settings.ENABLE_HYBRID_SEARCH:
-            self.sparse_model = SparseTextEmbedding(model_name="Qdrant/bm42-all-minilm-l6-v2-attentions")
+        # Initialize Sparse Model (Once)
+        if settings.ENABLE_HYBRID_SEARCH and _sparse_model is None:
+            _sparse_model = SparseTextEmbedding(model_name="Qdrant/bm42-all-minilm-l6-v2-attentions")
+        self.sparse_model = _sparse_model
 
     async def get_embedding(self, text: str) -> list[float]:
         text = text.replace("\n", " ")

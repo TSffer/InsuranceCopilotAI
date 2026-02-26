@@ -25,7 +25,12 @@ class IngestionService:
             chunk_overlap=200,
             separators=["\n\n", "\n", ".", " ", ""]
         )
-        self._ensure_collection()
+        try:
+            self._ensure_collection()
+        except Exception as e:
+            print(f"ERROR: Could not connect to Qdrant at startup: {e}")
+            # No lanzamos excepción para que la API pueda arrancar
+            # Fallará solo cuando se intente usar Qdrant.
 
     def _ensure_collection(self):
         try:

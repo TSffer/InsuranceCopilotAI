@@ -22,22 +22,36 @@ async def lifespan(app: FastAPI):
 
     # Inicializar Checkpointer (AsyncPostgresSaver)
     from src.services.agent_service import initialize_checkpointer
+    from src.services.semantic_router import SemanticRouter
+    from src.services.rag_service import RAGService
     try:
         await initialize_checkpointer()
     except Exception as e:
-        print(f"ERROR: Could not initialize checkpointer: {e}")
-        # We might want to raise here if it's critical, or just log
-        # raise e
+        print(f"WARNING: Could not initialize checkpointer: {e}. Check your POSTGRES_SERVER and POSTGRES_DB variables.")
 
     # Crear tablas
-    # En producción usamos Alembic para migraciones.
     async with engine.begin() as conn:
-        # await conn.run_sync(Base.metadata.drop_all) # Descomentar para resetear
         try:
             await conn.run_sync(Base.metadata.create_all)
         except Exception as e:
-            print(f"ERROR: Could not create tables. {e}")
-            raise e
+            print(f"WARNING: Could not create tables: {e}. Check your database connection parameters.")
+
+    async def prewarm_models():
+        print("Pre-warming AI models in background (this might take a few minutes)...")
+        try:
+            from src.services.semantic_router import SemanticRouter
+            from src.services.rag_service import RAGService
+            if settings.SEMANTIC_ROUTER_MODE == "semantic":
+                SemanticRouter()
+            else:
+                print("Skipping SemanticRouter model loading (Keyword mode enabled).")
+            RAGService()     # Carga Reranker y Sparse embeddings
+            print("AI models loaded successfully in background.")
+        except Exception as e:
+            print(f"WARNING: Could not pre-warm AI models: {e}")
+
+    asyncio.create_task(prewarm_models())
+
     yield
 
 app = FastAPI(
@@ -46,6 +60,10 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+@app.get("/health")
+async def health_check():
+    return {"status": "ok", "message": "Backend is running"}
+
 # Routers
 app.include_router(chat.router, prefix=settings.API_V1_STR, tags=["chat"])
 app.include_router(ingest.router, prefix=f"{settings.API_V1_STR}/ingest", tags=["ingestion"])
@@ -53,8 +71,6 @@ app.include_router(auth.router, prefix=f"{settings.API_V1_STR}/auth", tags=["aut
 app.include_router(files.router, prefix=f"{settings.API_V1_STR}/files", tags=["files"])
 
 # CORS Configuration
-# Para producción en Azure, permitimos todos los orígenes temporalmente
-# o puedes añadir la URL de tu Static Web App aquí.
 origins = ["*"]
 
 app.add_middleware(
