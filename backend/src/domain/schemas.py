@@ -32,23 +32,16 @@ class UserResponse(UserBase):
 
 # --- Quote Schemas ---
 class QuoteRequest(BaseModel):
-    # Client Data
     dni: Optional[str] = None
     email: Optional[str] = None
     first_name: Optional[str] = None
     last_name: Optional[str] = None
     phone: Optional[str] = None
     
-    # Risk Data
     age: int
-    # car_brand, car_model, etc. flattened or nested. 
-    # Frontend sends nested 'vehicle'. Let's support nested to match frontend types.ts more closely
-    # OR keep it flat. The current QuoteRequest is flat. 
-    # Frontend QuoteRequest: vehicle: { brand, model, year, type }
-    # Let's align backend to frontend for easier integration.
-    vehicle: Optional[dict] = None # Flexible dict for now to avoid validation hell, or define a schema.
+
+    vehicle: Optional[dict] = None 
     
-    # Flattened for backward compatibility if needed, but let's encourage nested
     car_brand: Optional[str] = None
     car_model: Optional[str] = None
     car_year: Optional[int] = None
@@ -73,7 +66,6 @@ from datetime import datetime
 
 # --- Chat/RAG Schemas ---
 class ChatRequest(BaseModel):
-    # Frontend sends 'message: string'. thread_id optional
     message: str
     thread_id: Optional[str] = None
     

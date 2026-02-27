@@ -17,7 +17,6 @@ from ..core.config import settings
 from ..services.semantic_router import SemanticRouter
 
 # Global checkpointer variables
-# Pool and saver are initialized lazily
 _pool: AsyncConnectionPool = None
 _checkpointer: AsyncPostgresSaver = None
 
@@ -25,8 +24,6 @@ _checkpointer: AsyncPostgresSaver = None
 async def initialize_checkpointer():
     global _pool, _checkpointer
     if _pool is None:
-        # PostgresSaver needs autocommit=True for the initial setup (migrations)
-        # because some operations (like CREATE INDEX CONCURRENTLY) cannot run in a transaction block.
         try:
             _pool = AsyncConnectionPool(
                 conninfo=settings.POSTGRES_CONNECTION_URI, 
@@ -59,17 +56,13 @@ class AgentService:
         self.chat_service = ChatService(db)
 
     async def get_checkpointer(self):
-        """
-        Singleton lazy initialization of AsyncPostgresSaver.
-        Ensures setup() is called once to create tables.
-        """
         return await initialize_checkpointer()
 
     async def get_executor(self) -> Any:
         # 0. Obtener Checkpointer (Persistencia)
         checkpointer = await self.get_checkpointer()
 
-        # 1. Definir Herramientas (Tools)
+        # 1. Definir Tools
         
         @tool
         async def calculate_insurance_quote(age: int, car_brand: str, car_model: str, car_year: int, dni: str = None, first_name: str = None, usage: str = "Particular") -> str:
@@ -114,7 +107,6 @@ class AgentService:
             Busca en la documentación legal y pólizas.
             """
             result = await self.rag_service.answer_legal_query(query)
-            # Retornamos JSON con respuesta y sources para procesarlo después
             return json.dumps(result, ensure_ascii=False)
 
         @tool
@@ -125,9 +117,7 @@ class AgentService:
             Ejemplo: 'Diferencia entre Rimac y Pacífico', 'Comparar deducibles', 'Coberturas de Rimac y Mapfre'.
             Genera una TABLA COMPARATIVA basándose en la documentación legal.
             """
-            # Forzamos el formato de tabla en el servicio RAG
             result = await self.rag_service.answer_legal_query(query, force_table=True)
-            # Retornamos JSON con respuesta y sources para procesarlo después
             return json.dumps(result, ensure_ascii=False)
 
         tools = [calculate_insurance_quote, search_legal_conditions, compare_insurance_policies]
@@ -144,8 +134,7 @@ class AgentService:
             - Si la pregunta es compleja y requiere ambos (precios y condiciones), puedes usar múltiples herramientas.
             """
 
-        # 3. Crear Agente ReAct con LangGraph
-        # Usamos prompt para el system prompt (Langgraph < 0.2.0)
+        # 3. Crear Agente con LangGraph
         agent = create_react_agent(self.llm, tools, prompt=system_prompt, checkpointer=checkpointer)
         return agent
 
@@ -160,7 +149,6 @@ class AgentService:
             thread_id = thread.id
             
         # 2. Enrutamiento Semántico (Optimización y Seguridad)
-        # Verificamos si podemos responder sin llamar al LLM/Agente costoso
         router = SemanticRouter()
         route = await router.route(user_query)
         
@@ -177,7 +165,6 @@ class AgentService:
             return {"answer": response, "thread_id": thread_id}
 
         # 3. Ejecución del Agente para consultas de negocio (Quote, Comparison, Info)
-        # Si no es saludo ni inseguro, dejamos que el Agente decida qué herramienta usar.
         executor = await self.get_executor()
         
         inputs = {"messages": [("user", user_query)]}
@@ -189,11 +176,10 @@ class AgentService:
         # Extraemos el último mensaje del asistente
         assistant_response = result["messages"][-1].content
         
-        # Extraer sources de los ToolMessages si existen (parseando JSON)
+        # Extraer sources de los ToolMessages 
         unique_sources = {}
         for msg in result["messages"]:
             if isinstance(msg, ToolMessage):
-                # Intentar parsear el contenido como JSON
                 try:
                     data = json.loads(msg.content)
                     if isinstance(data, dict) and "sources" in data:
@@ -201,7 +187,6 @@ class AgentService:
                              if isinstance(s, dict) and "title" in s:
                                 unique_sources[s["title"]] = s
                 except:
-                    # Si no es JSON, o falla, ignorar (puede ser calculate_quote que devuelve string plano)
                     pass
                             
         # 4. Guardar Interacción

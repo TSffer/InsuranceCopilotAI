@@ -34,7 +34,6 @@ class QuoteService:
             customer_id = customer.id
 
         # 2. Buscar tasas que coincidan con el vehículo
-        # Normalizar datos desde flatten o nested
         car_brand = request.car_brand
         car_model = request.car_model
         car_year = request.car_year

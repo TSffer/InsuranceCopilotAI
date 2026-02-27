@@ -17,7 +17,6 @@ class IngestionService:
         self.collection_name = settings.QDRANT_COLLECTION_NAME
         
         if settings.ENABLE_HYBRID_SEARCH:
-            # Init sparse model (CPU optimized, fast)
             self.sparse_model = SparseTextEmbedding(model_name="Qdrant/bm42-all-minilm-l6-v2-attentions")
             
         self.text_splitter = RecursiveCharacterTextSplitter(
@@ -29,8 +28,6 @@ class IngestionService:
             self._ensure_collection()
         except Exception as e:
             print(f"ERROR: Could not connect to Qdrant at startup: {e}")
-            # No lanzamos excepción para que la API pueda arrancar
-            # Fallará solo cuando se intente usar Qdrant.
 
     def _ensure_collection(self):
         try:
@@ -87,7 +84,6 @@ class IngestionService:
 
     def get_sparse_vector(self, text: str) -> models.SparseVector:
         # Generate sparse vector
-        # list() because embed returns a generator
         sparse_embedding = list(self.sparse_model.embed([text]))[0] 
         return models.SparseVector(
             indices=sparse_embedding.indices.tolist(),

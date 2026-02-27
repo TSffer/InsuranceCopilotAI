@@ -34,13 +34,11 @@ class SemanticRouter:
 
         self.collection_name = settings.QDRANT_SEMANTIC_COLLECTION_NAME
         
-        # Anchors for Greeting
         self.greeting_anchors = [
             "hola", "buenos dias", "buenas tardes", "buenas noches", 
             "hey", "hello", "hi", "que tal", "como estas", "saludos"
         ]
         
-        # Anchors for Safety / Unsafe content
         self.unsafe_anchors = [
             "ignore previous instructions", "system prompt", "delete database", 
             "drop table", "exec(", "eval(", "import os", "rm -rf", 
@@ -49,15 +47,14 @@ class SemanticRouter:
 
     async def initialize(self):
         """
-        Ensure collection exists and populate it if empty.
-        Handles migration if vector size changed.
+        Asegúrese de que la colección exista y rellénela si está vacía. 
+        Gestiona la migración si cambia el tamaño del vector.
         """
         try:
-            # Check if collection exists
+            # Comprobar si existe la colección
             exists = self.qdrant.collection_exists(self.collection_name)
             
             if exists:
-                # Check vector config
                 collection_info = self.qdrant.get_collection(self.collection_name)
                 if collection_info.config.params.vectors.size != self.vector_size:
                     print(f"Vector dimension mismatch (found {collection_info.config.params.vectors.size}, expected {self.vector_size}). Recreating collection...")
@@ -65,7 +62,7 @@ class SemanticRouter:
                     exists = False
 
             if not exists:
-                # Create collection
+                # Crear colección
                 self.qdrant.create_collection(
                     collection_name=self.collection_name,
                     vectors_config=models.VectorParams(
@@ -74,21 +71,17 @@ class SemanticRouter:
                     )
                 )
                 
-                # Populate
                 await self._populate_initial_anchors()
             else:
-                 # Even if exists, check count just in case
                 count = self.qdrant.count(self.collection_name).count
                 if count == 0:
                      await self._populate_initial_anchors()
                      
         except Exception as e:
-            print(f"Error initializing SemanticRouter (Qdrant): {e}")
+            print(f"Error al inicializar SemanticRouter (Qdrant): {e}")
 
-    async def _populate_initial_anchors(self):
-        print("Populating initial semantic anchors in Qdrant (FastEmbed)...")
-        
-        # Greetings
+    async def _populate_initial_anchors(self):        
+        # Saludos / despedidas
         greeting_embs = await self._get_embeddings_batch(self.greeting_anchors)
         points = []
         for i, text in enumerate(self.greeting_anchors):
@@ -98,7 +91,7 @@ class SemanticRouter:
                 payload={"type": "GREETING", "text": text}
             ))
             
-        # Unsafe
+        # Mensajes potencialmente peligrosos
         unsafe_embs = await self._get_embeddings_batch(self.unsafe_anchors)
         for i, text in enumerate(self.unsafe_anchors):
             points.append(models.PointStruct(
@@ -114,14 +107,12 @@ class SemanticRouter:
             )
 
     async def _get_embeddings_batch(self, texts: List[str]) -> List[List[float]]:
-        # FastEmbed es sincrono pero rapido, wrapper async si fuera necesario, 
-        # pero aqui podemos llamarlo directo. Devuelve un generador.
+        # FastEmbed es sincrono
         embeddings = list(self.embedding_model.embed(texts))
         return [e.tolist() for e in embeddings]
 
     async def get_embedding(self, text: str) -> List[float]:
         text = text.replace("\n", " ")
-        # FastEmbed handles list of texts
         embeddings = list(self.embedding_model.embed([text]))
         return embeddings[0].tolist()
 
@@ -133,7 +124,6 @@ class SemanticRouter:
             return await self._route_keyword(query)
         
         # Modo Semántico (Original)
-        # Ensure init (light check)
         await self.initialize()
 
         query_vector = await self.get_embedding(query)
@@ -152,7 +142,7 @@ class SemanticRouter:
         score = top_match.score
         route_type = top_match.payload.get("type")
         
-        # Thresholds (ajustar segun modelo)
+        # Thresholds
         unsafe_threshold = 0.60 
         greeting_threshold = 0.65
         
@@ -177,8 +167,7 @@ class SemanticRouter:
         if any(word in query_lower for word in self.unsafe_anchors):
             return "UNSAFE"
             
-        # 2. Búsqueda por similitud (difflib) para capturar typos
-        # Usamos un cutoff alto (0.8) para evitar falsos positivos
+        # 2. Búsqueda por similitud (difflib) para capturar tipos
         close_greetings = difflib.get_close_matches(query_lower, self.greeting_anchors, n=1, cutoff=0.8)
         if close_greetings:
             return "GREETING"
@@ -188,69 +177,3 @@ class SemanticRouter:
             return "UNSAFE"
             
         return None
-
-    async def add_anchor(self, text: str, anchor_type: str):
-        """
-        Adds a single new anchor to the collection.
-        anchor_type: 'GREETING' or 'UNSAFE'
-        """
-        await self.initialize()
-        
-        embedding = await self.get_embedding(text)
-        point = models.PointStruct(
-            id=str(uuid.uuid4()),
-            vector=embedding,
-            payload={"type": anchor_type.upper(), "text": text}
-        )
-        
-        self.qdrant.upsert(
-            collection_name=self.collection_name,
-            points=[point]
-        )
-        print(f"Added anchor: '{text}' as {anchor_type.upper()}")
-
-    async def list_anchors(self):
-        """
-        Lists all anchors in the collection.
-        Returns a list of dicts: {'text': str, 'type': str}
-        """
-        await self.initialize()
-        
-        # Scroll through all points
-        points, _ = self.qdrant.scroll(
-            collection_name=self.collection_name,
-            limit=100, # Adjust limit as needed
-            with_payload=True,
-            with_vectors=False
-        )
-        
-        anchors = []
-        for p in points:
-            anchors.append({
-                "text": p.payload.get("text"),
-                "type": p.payload.get("type")
-            })
-            
-        return anchors
-
-    async def delete_anchor(self, text: str):
-        """
-        Deletes an anchor by its exact text match.
-        """
-        await self.initialize()
-        
-        # Using Qdrant filter to delete by payload field 'text'
-        self.qdrant.delete(
-            collection_name=self.collection_name,
-            points_selector=models.FilterSelector(
-                filter=models.Filter(
-                    must=[
-                        models.FieldCondition(
-                            key="text",
-                            match=models.MatchValue(value=text)
-                        )
-                    ]
-                )
-            )
-        )
-        print(f"Deleted anchor: '{text}'")

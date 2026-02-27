@@ -91,9 +91,9 @@ async def main():
     for root, dirs, files in os.walk(DATA_DIR):
         for file in files:
             if file.lower().endswith(".pdf"):
-                # El nombre de la carpeta padre es la aseguradora (ej: .../data/rimac -> rimac)
+                # El nombre de la carpeta padre es la aseguradora
                 insurer_folder = os.path.basename(root)
-                # Si el archivo está en la raiz 'data', insurer_folder seria 'data'
+                
                 if insurer_folder == "data": 
                     insurer_folder = "Genérico"
                 

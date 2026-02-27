@@ -7,7 +7,6 @@ from ..core.config import settings
 import asyncio
 
 
-# Global instances to avoid reloading models on every request
 _qdrant_client = None
 _ranker = None
 _sparse_model = None
@@ -16,7 +15,7 @@ class RAGService:
     def __init__(self):
         global _qdrant_client, _ranker, _sparse_model
         
-        # Initialize Qdrant
+        # Inicializar Qdrant
         if _qdrant_client is None:
             _qdrant_client = QdrantClient(
                 url=settings.QDRANT_URL,
@@ -25,15 +24,15 @@ class RAGService:
         self.qdrant = _qdrant_client
         self.collection_name = settings.QDRANT_COLLECTION_NAME
         
-        # Initialize LLM
+        # Inicializar LLM
         self.client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
         
-        # Initialize Reranker (Once)
+        # Inicializar Reranker (Once)
         if settings.ENABLE_RERANKING and _ranker is None:
             _ranker = Ranker(model_name=settings.RERANK_MODEL, cache_dir="/tmp/flashrank")
         self.ranker = _ranker
             
-        # Initialize Sparse Model (Once)
+        # Inicializar Sparse Model (Once)
         if settings.ENABLE_HYBRID_SEARCH and _sparse_model is None:
             _sparse_model = SparseTextEmbedding(model_name="Qdrant/bm42-all-minilm-l6-v2-attentions")
         self.sparse_model = _sparse_model
@@ -67,7 +66,7 @@ class RAGService:
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": query}
                 ],
-                temperature=0.7
+                temperature=0.5
             )
             content = response.choices[0].message.content
             variants = [v.strip() for v in content.split("||")]
@@ -75,25 +74,22 @@ class RAGService:
         except Exception:
             return [query]
 
-    async def retrieve_documents(self, queries: list[str], limit: int = 5) -> list[dict]:
+    async def retrieve_documents(self, queries: list[str], limit: int = 10) -> list[dict]:
         all_docs = {}
         
         for q in queries:
-            # 1. Generate Vectors
             dense_vector = await self.get_embedding(q)
             
-            # 2. Hybrid Search Logic (Prefetch)
             if settings.ENABLE_HYBRID_SEARCH:
                 sparse_vector = self.get_sparse_vector(q)
                 
-                # Hybrid Search: Prefetch with Sparse -> Rescore with Dense
                 results = self.qdrant.query_points(
                     collection_name=self.collection_name,
                     prefetch=[
                         models.Prefetch(
                             query=sparse_vector,
                             using="sparse",
-                            limit=limit * 2, # Get more candidates from sparse
+                            limit=limit * 2, 
                         )
                     ],
                     query=dense_vector,
@@ -103,7 +99,6 @@ class RAGService:
                 ).points
                 
             else:
-                # Dense only
                 results = self.qdrant.query_points(
                     collection_name=self.collection_name,
                     query=dense_vector,
@@ -147,7 +142,7 @@ class RAGService:
         return reranked_docs
 
     async def answer_legal_query(self, query: str, force_table: bool = False) -> dict:
-        # Pipeline execution
+        # Pipeline ejecución
         queries = await self.expand_query(query)
         docs = await self.retrieve_documents(queries)
         
@@ -163,18 +158,13 @@ class RAGService:
             for d in docs
         ])
         
-        # Extract rich sources
-        # We want to return a list of unique sources with their content for hover preview
-        # If multiple chunks come from the same file, we can either concatenate or just take the top one.
-        # Let's take the top chunk for preview or the most relevant one.
-        
         unique_sources_map = {}
         for d in docs:
             fname = d.get('metadata', {}).get('source_file', 'Unknown')
             if fname not in unique_sources_map:
                 unique_sources_map[fname] = {
                     "title": fname,
-                    "content": d['content'], # Simplified: taking the first chunk's content as preview
+                    "content": d['content'],
                     "id": str(d.get("id", "")),
                     "score": float(d.get("score")) if d.get("score") is not None else None
                 }

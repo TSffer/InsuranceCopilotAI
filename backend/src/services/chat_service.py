@@ -19,7 +19,6 @@ class ChatService:
         self.db.add(new_thread)
         await self.db.commit()
         
-        # Re-fetch with eager loading to avoid MissingGreenlet
         result = await self.db.execute(
             select(ChatThread)
             .where(ChatThread.id == new_thread.id)
@@ -49,7 +48,7 @@ class ChatService:
         if thread:
             thread.title = thread_update.title
             await self.db.commit()
-            # Re-fetch to ensure all columns (updated_at) and relationships (messages) are fresh and loaded
+
             return await self.get_thread(thread_id, user_id)
         return thread
 
@@ -71,13 +70,10 @@ class ChatService:
         )
         self.db.add(new_msg)
         
-        # Update thread updated_at
         thread_result = await self.db.execute(select(ChatThread).where(ChatThread.id == thread_id))
         thread = thread_result.scalars().first()
         if thread:
-             pass # SQLAlchemy handles onupdate, but explicit touch ensures it updates even if only child added? 
-             # Actually, adding child doesn't always trigger parent update in simple configs. 
-             # Let's rely on db trigger or explicit touch if needed. For now default is enough.
+             pass 
         
         await self.db.commit()
         await self.db.refresh(new_msg)
